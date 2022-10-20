@@ -13,4 +13,4 @@ bin           = @["dfa"]
 requires "nim >= 1.6.6"
 
 task gen, "generates 'script.js' file":
-    exec "nim -d:danger js -o:build/script.js src/webapp.nim"
+    exec "nim js -o:build/script.js src/webapp.nim"

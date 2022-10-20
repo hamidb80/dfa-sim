@@ -12,25 +12,27 @@ import dfa
 
 type
   AppState = enum
-    asInitial
+    asInitial = "initial"
 
-    asPlaceNewState
-    asReanmeState
-    asStateSelected
+    asPlaceNewState = "place new state"
+    asStateSelected = "state is selected"
 
   AppObject = object
-    state: AppState
+    # --- canvas
     layer: KLayer
     transformer: KTransformer
-
-    dfa: DFa
+    # --- data
+    state: AppState
+    dfa: Dfa
 
 # ----------------------------
 
 var
   app = AppObject(
     state: asInitial,
-    layer: newLayer())
+    layer: newLayer(),
+
+    )
 
 # ----------------------------
 
@@ -49,7 +51,7 @@ proc backgroundClick(e: KMouseEvent) =
       onclick = stateClick
       addTo app.layer
 
-    app.state = asReanmeState
+    app.state = asStateSelected
     redraw()
 
   else:
@@ -58,8 +60,20 @@ proc backgroundClick(e: KMouseEvent) =
 proc enterPlaceState =
   app.state = asPlaceNewState
 
-proc doNothing =
+proc setName =
+  assert app.state == asStateSelected
+  let name = getVNodeById("name-of-state").dom.value
+  echo name
+
+proc resetState =
+  app.state = asInitial
+
+proc rebuild =
   discard
+
+proc rerender =
+  destroyChildren app.layer
+
 
 # ----------------------------
 
@@ -67,28 +81,34 @@ proc createDom: VNode =
   buildHtml main:
     navbar:
       tdiv:
-        navbtn "new state", bccPrimary, enterPlaceState
-        navbtn "add transition", bccSuccess, doNothing
-        navbtn "rename", bccWarning, doNothing
-        navbtn "delete", bccDanger, doNothing
-        navbtn "run", bccInfo, doNothing
-        navbtn "save", bccDark, doNothing
+        case app.state
+        of asStateSelected:
+          navbtn "add transition", bccSuccess, resetState
+          navbtn "delete", bccDanger, resetState
+        else:
+          navbtn "new state", bccPrimary, enterPlaceState
+          navbtn "run", bccInfo, resetState
+          navbtn "save", bccDark, resetState
+
 
       h4:
         bold:
           text "DFA Simulation"
 
-    verbatim "<div id='board'></div>"
+    konva "board"
 
-    text $app.state
+    status:
+      bold: text "STATE: "
+      text $app.state
 
-    case app.state
-    of asReanmeState:
-      footer(class = "px-2 navbar navbar-expand-lg navbar-light bg-light d-flex justify-content-between align-items-center"):
-        input()
-        navbtn "submit", bccPrimary, doNothing
+    extra:
+      case app.state
+      of asStateSelected:
+        input(class = "form-control", id = "name-of-state",
+            placeholder = "name of the state")
+        navbtn "set", bccPrimary, setName
 
-    else: discard
+      else: discard
 
 proc initBoard =
   let

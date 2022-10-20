@@ -32,13 +32,17 @@ func newStage*(container: cstring | Element): KStage
 func newLayer*(): KLayer
   {.importcpp: "new Konva.Layer()".}
 
+func destroyChildren*(l: KLayer)
+  {.importcpp: "#.destroyChildren()".}
+
+
 func newCircle*(): KCircle
   {.importcpp: "new Konva.Circle()".}
 
 func add*(s, n: Knode)
   {.importcpp: "#.add(#)".}
 
-func addTo*(n, s: Knode) = 
+func addTo*(n, s: Knode) =
   s.add n
 
 

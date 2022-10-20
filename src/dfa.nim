@@ -1,12 +1,13 @@
-import std/[jscore, jsffi]
 import std/[tables, hashes]
 
 type
-  State* = string
+  Position* = tuple[x,y: float]
+
   Terminal* = string
+  State* = string
 
   Dfa* = object
-    states*: seq[State]
+    states*: Table[State, Position]
     alphabet*: seq[Terminal]
     transitionsFns*: Table[(State, Terminal), State]
     initialState*: State
