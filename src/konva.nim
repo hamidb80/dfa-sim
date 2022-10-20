@@ -8,6 +8,7 @@ type
   KShape* = object of KNode
 
   KGroup* = object of KShape
+  KArrow* = object of KShape
   KCircle* = object of KShape
   KText* = object of KShape
   KLine* = object of KShape
@@ -30,8 +31,21 @@ type
 func newStage*(container: cstring | Element): KStage
   {.importcpp: "new Konva.Stage({container: #})".}
 
-func newLayer*(): KLayer
+func newLayer*: KLayer
   {.importcpp: "new Konva.Layer()".}
+
+func newGroup*: KGroup
+  {.importcpp: "new Konva.Group()".}
+
+func newCircle*: KCircle
+  {.importcpp: "new Konva.Circle()".}
+
+func newText*: KText
+  {.importcpp: "new Konva.Text()".}
+
+func newArrow*: KArrow
+  {.importcpp: "new Konva.Arrow()".}
+
 
 func destroyChildren*(l: KLayer)
   {.importcpp: "#.destroyChildren()".}
@@ -44,16 +58,6 @@ func add*(s, n: Knode)
 
 func addTo*(n, s: Knode) =
   s.add n
-
-
-func newCircle*(): KCircle
-  {.importcpp: "new Konva.Circle()".}
-
-func newText*(): KText
-  {.importcpp: "new Konva.Text()".}
-
-func newGroup*(): KGroup
-  {.importcpp: "new Konva.Group()".}
 
 
 func `x=`*(k: KNode, n: Number)
@@ -119,11 +123,25 @@ func `align`*(k: KText): cstring
   {.importcpp: "#.align()".}
 
 
+func `stroke=`*(k: KNode, n: cstring)
+  {.importcpp: "#.stroke(#)".}
+
+func `stroke`*(k: KNode): cstring
+  {.importcpp: "#.stroke()".}
+
+
 func `listening=`*(k: KText, n: bool)
   {.importcpp: "#.listening(#)".}
 
 func `listening`*(k: KText): bool
   {.importcpp: "#.listening()".}
+
+
+func `points=`*(k: KNode, cs: seq[Number])
+  {.importcpp: "#.points(#)".}
+
+func `points`*(k: KNode): seq[Number]
+  {.importcpp: "#.points()".}
 
 
 func `onclick=`*(k: KNode, cb: proc(ev: KMouseEvent))

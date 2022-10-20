@@ -1,4 +1,4 @@
-import std/[strformat, with, tables]
+import std/[strformat, with, tables, strutils, sets]
 
 import std/[dom, jsconsole]
 include karax/prelude
@@ -30,7 +30,7 @@ type
     step: AppState
     dfa: Dfa
 
-    selectedState: string
+    selectedStates: seq[string]
 
 # ----------------------------
 
@@ -40,7 +40,7 @@ var
   app = AppObject(
     step: asInitial,
     layer: newLayer(),
-    selectedState: "",
+    selectedStates: @[],
     )
 
 # ----------------------------
@@ -57,17 +57,23 @@ proc findState(pos: Position): State =
 proc stateClick(e: KMouseEvent) =
   e.cancel
 
-  let s = findState((e.evt.offsetX.float, e.evt.offsetY.float))
+  let
+    p = (e.evt.offsetX.float, e.evt.offsetY.float)
+    s = findState(p)
+
   case app.step
-  of asInitial:
-    app.selectedState = s
+  of asInitial, asStateSelected:
+    app.selectedStates = @[s]
     app.step = asStateSelected
-    redraw()
 
   of asTransitionSelectOtherState:
+    app.selectedStates.add s
     app.step = asTransitionEnterTerminals
 
   else: discard
+
+  redraw()
+
 
 proc backgroundClick(e: KMouseEvent) =
   case app.step
@@ -76,11 +82,8 @@ proc backgroundClick(e: KMouseEvent) =
     app.dfa.states[randomStr(10).State] =
       (e.evt.offsetX.float, e.evt.offsetY.float)
 
-  of asStateSelected:
-    app.step = asInitial
-
   else:
-    discard
+    app.step = asInitial
 
   rerender()
   redraw()
@@ -88,18 +91,44 @@ proc backgroundClick(e: KMouseEvent) =
 proc enterPlaceState =
   app.step = asPlaceNewState
 
+proc enterNewTranstion =
+  app.step = asTransitionSelectOtherState
+
+proc setTerminals =
+  let terminals = $getVNodeById("terminals").dom.value
+
+  for t in terminals.split ",":
+    let
+      term = t.strip
+      s1 = app.selectedStates[0]
+      s2 = app.selectedStates[1]
+
+    if s1 in app.dfa.transitions:
+      app.dfa.transitions[s1][term] = s2
+    else:
+      app.dfa.transitions[s1] = totable {term: s2}
+
+  app.step = asInitial
+  rerender()
+
+proc setInitial(t: bool) =
+  if t == true:
+    app.dfa.initialState = app.selectedStates[0]
+
+proc toggleAsFinal(t: bool) =
+  if t:
+    app.dfa.finalStates.incl app.selectedStates[0]
+  else:
+    app.dfa.finalStates.excl app.selectedStates[0]
+
 proc setName =
   assert app.step == asStateSelected
   let
-    newname = $getVNodeById("name-of-state").dom.value
-    oldname = app.selectedState
-    pos = app.dfa.states[oldname]
+    newName = $getVNodeById("name-of-state").dom.value
+    oldName = app.selectedStates[0]
 
-  app.selectedState = newname
-  app.dfa.states[newname] = pos
-  del app.dfa.states, oldname
-  # FIXME use `rename` & from `dfa` module
-
+  app.dfa.rename oldName, newName
+  app.selectedStates = @[newname]
   rerender()
 
 proc resetState =
@@ -109,9 +138,9 @@ proc resetState2(b: bool) =
   discard
 
 proc removeState =
-  app.dfa.remove app.selectedState
+  app.dfa.remove app.selectedStates[0]
   app.step = asInitial
-  app.selectedState = ""
+  reset app.selectedStates
   rerender()
 
 # ----------------------------
@@ -128,7 +157,10 @@ proc rerender =
     with c:
       x = p.x
       y = p.y
-      fill = pink
+      fill =
+        if app.dfa.initialState == s: green
+        else: pink
+
       radius = stateRadius
       onclick = stateClick
       addTo g
@@ -141,14 +173,32 @@ proc rerender =
       listening = false
       addTo g
 
-
-    if s == app.dfa.initialState:
-      discard
-
-    if app.dfa.isAcceptable s:
-      discard
-
     g.addto app.layer
+
+    if app.dfa.isFinal s:
+      c.stroke = "black"
+
+  for s, p in app.dfa.states:
+    for otherState, terms in app.dfa.reducedTerms(s):
+      let
+        pp = app.dfa.states[otherState]
+        label = terms.join(", ")
+        med = (p .. pp) * 0.2
+
+      let a = newArrow()
+      with a:
+        points = @[p.x, p.y, pp.x, pp.y]
+        stroke = "black"
+        addTo app.layer
+
+
+      let txt = newText()
+      with txt:
+        text = label
+        x = med.x
+        y = med.y
+        addTo app.layer
+
 
   draw app.layer
 
@@ -157,18 +207,22 @@ proc createDom: VNode =
     navbar:
       tdiv:
         case app.step
+
         of asStateSelected:
-          navbtn "add transition", bccWarning, resetState
+          navbtn "add transition", bccWarning, enterNewTranstion
           navToggle "initial state", bccSuccess,
-            app.selectedState == app.dfa.initialState, resetState2
+            app.selectedStates[0] == app.dfa.initialState, setInitial
           navToggle "final state", bccSuccess,
-              app.dfa.isAcceptable app.selectedState, resetState2
+              app.dfa.isFinal app.selectedStates[0], toggleAsFinal
           navbtn "delete", bccDanger, removeState
-        else:
+
+        of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccInfo, resetState
           navbtn "save", bccDark, resetState
 
+        else:
+          navbtn "cancel", bccWarning, resetState
 
       h4:
         bold:
@@ -177,13 +231,13 @@ proc createDom: VNode =
     konva "board"
 
     status:
-      bold: text "STATE: "
+      bold: text "STATUS: "
       text $app.step
 
       case app.step
       of asStateSelected:
         text " - "
-        text app.selectedState
+        text app.selectedStates[0]
 
       else:
         discard
@@ -192,8 +246,18 @@ proc createDom: VNode =
       case app.step
       of asStateSelected:
         input(class = "form-control", id = "name-of-state",
-            value = app.selectedState, placeholder = "name of the state")
+          value = app.selectedStates[0],
+          placeholder = "name of the state")
+
         navbtn "set", bccPrimary, setName
+
+      of asTransitionEnterTerminals:
+        input(class = "form-control", id = "terminals",
+          value = "",
+          placeholder = "terminals separated by (,)")
+
+        navbtn "set", bccPrimary, setTerminals
+
 
       else: discard
 

@@ -29,7 +29,7 @@ when false:
       unfocus last state
       focus new state
 
-    if dfa.isAcceptable q:
+    if dfa.isFinal q:
       discard
     else:
       discard
