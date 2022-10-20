@@ -1,12 +1,20 @@
 import std/[strformat, with, dom, jsconsole]
 
 include karax/prelude
+import uicomponents
 import konva
 
+import dfa
+
+
+# ----------------------------
 
 type
   AppState = enum
-    asNormal
+    asInitial
+
+    asPlaceNewState
+    asReanmeState
     asStateSelected
 
   AppObject = object
@@ -14,68 +22,58 @@ type
     layer: KLayer
     transformer: KTransformer
 
+    dfa: Dfa
 
-  BootstrapColorClass = enum
-    bccPrimary = "primary"
-    bccSecondary = "secondary"
-    bccSuccess = "success"
-    bccInfo = "info"
-    bccWarning = "warning"
-    bccDanger = "danger"
-    bccLight = "light"
-    bccDark = "dark"
+# ----------------------------
 
+var
+  lastState: AppState
+  forceUpdate: bool
 
-func navbar(): VNode =
-  buildHtml nav(class = "navbar navbar-expand-lg navbar-light bg-light px-3 d-flex justify-content-between align-items-center")
+  app = AppObject(
+    state: asInitial,
+    layer: newLayer())
 
-proc navbtn(t: string, color: BootstrapColorClass, action: proc): VNode =
-  # let ext =
-  #   if disabled: "disabled"
-  #   else: ""
-
-  buildHtml button(class = fmt"btn mx-1 btn-outline-{color}"):
-    proc onclick = action()
-    text t
-
-
-var app = AppObject(
-  layer: newLayer())
-
-proc stageClick(e: KMouseEvent) =
-  discard
+# ----------------------------
 
 proc stateClick(e: KMouseEvent) =
   e.cancel
-  e.target.fill = "black"
 
+proc backgroundClick(e: KMouseEvent) =
+  case app.state
+  of asPlaceNewState:
+    let c = newCircle()
+    with c:
+      x = e.evt.offsetX
+      y = e.evt.offsetY
+      fill = "red"
+      radius = 30
+      onclick = stateClick
+      addTo app.layer
 
-proc newState =
-  let c = newCircle()
-  with c:
-    x = 100
-    y = 100
-    fill = "red"
-    radius = 10
+    app.state = asReanmeState
+    redraw()
 
-  c.onclick = stateClick
+  else:
+    discard
 
-  app.layer.add c
+proc enterPlaceState =
+  app.state = asPlaceNewState
 
-# func bold(t: string): VNode =
-#   buildHtml span(class = "font-weight-bold"):
-#     text t
+proc doNothing = discard
 
-proc createDom(): VNode =
+# ----------------------------
+
+proc createDom: VNode =
   buildHtml main:
     navbar:
       tdiv:
-        navbtn "new state", bccPrimary, newState
-        navbtn "add transition", bccSuccess, newState
-        navbtn "rename", bccWarning, newState
-        navbtn "delete", bccDanger, newState
-        navbtn "run", bccInfo, newState
-        navbtn "save", bccDark, newState
+        navbtn "new state", bccPrimary, enterPlaceState
+        navbtn "add transition", bccSuccess, doNothing
+        navbtn "rename", bccWarning, doNothing
+        navbtn "delete", bccDanger, doNothing
+        navbtn "run", bccInfo, doNothing
+        navbtn "save", bccDark, doNothing
 
       h4:
         bold:
@@ -83,22 +81,27 @@ proc createDom(): VNode =
 
     tdiv(id = "board")
 
+    case app.state
+    of asReanmeState: 
+      discard
+
+    else: 
+      discard
+
+proc initBoard =
+  let
+    w = window.innerWidth
+    h = window.innerHeight / 2
+    s = newStage("board")
+
+  with s:
+    width = w
+    height = h
+
+  s.add app.layer
+  s.onclick = backgroundClick
+
 
 when isMainModule:
   setRenderer createDom, "root"
-
-  proc setTimeout(ms: int, action: proc ()) =
-    discard setTimeout(action, ms)
-
-  setTimeout 500, proc =
-    let
-      w = window.innerWidth
-      h = window.innerHeight / 2
-      s = newStage("board")
-
-    with s:
-      width = w
-      height = h
-
-    s.add app.layer
-    s.onclick = stageClick
+  discard setTimeout(initBoard, 500)

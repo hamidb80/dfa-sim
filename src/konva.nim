@@ -10,7 +10,7 @@ type
   KCircle* = object of KShape
   KText* = object of KShape
 
-  KTransformer = object of JsObject
+  KTransformer* = object of JsObject
 
   KEvent* = object of JsObject
   KMouseEvent* = object of KEvent
@@ -24,6 +24,7 @@ type
   Number* = int or float
 
 
+
 func newStage*(container: cstring): KStage
   {.importcpp: "new Konva.Stage({container: #})".}
 
@@ -35,6 +36,9 @@ func newCircle*(): KCircle
 
 func add*(s, n: Knode)
   {.importcpp: "#.add(#)".}
+
+func addTo*(n, s: Knode) = 
+  s.add n
 
 
 func `x=`*(k: KNode, n: Number)
