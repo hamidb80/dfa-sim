@@ -9,6 +9,7 @@ type
 
   KCircle* = object of KShape
   KText* = object of KShape
+  KLine* = object of KShape
 
   KTransformer* = object of JsObject
 
@@ -25,7 +26,7 @@ type
 
 
 
-func newStage*(container: cstring): KStage
+func newStage*(container: cstring | Element): KStage
   {.importcpp: "new Konva.Stage({container: #})".}
 
 func newLayer*(): KLayer

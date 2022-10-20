@@ -1,7 +1,8 @@
-import std/[strformat, with, dom, jsconsole]
+import std/[strformat, with]
 
+import std/[dom, jsconsole]
 include karax/prelude
-import uicomponents
+import ui
 import konva
 
 import dfa
@@ -22,14 +23,11 @@ type
     layer: KLayer
     transformer: KTransformer
 
-    dfa: Dfa
+    dfa: DFa
 
 # ----------------------------
 
 var
-  lastState: AppState
-  forceUpdate: bool
-
   app = AppObject(
     state: asInitial,
     layer: newLayer())
@@ -46,7 +44,7 @@ proc backgroundClick(e: KMouseEvent) =
     with c:
       x = e.evt.offsetX
       y = e.evt.offsetY
-      fill = "red"
+      fill = pink
       radius = 30
       onclick = stateClick
       addTo app.layer
@@ -60,7 +58,8 @@ proc backgroundClick(e: KMouseEvent) =
 proc enterPlaceState =
   app.state = asPlaceNewState
 
-proc doNothing = discard
+proc doNothing =
+  discard
 
 # ----------------------------
 
@@ -79,20 +78,23 @@ proc createDom: VNode =
         bold:
           text "DFA Simulation"
 
-    tdiv(id = "board")
+    verbatim "<div id='board'></div>"
+
+    text $app.state
 
     case app.state
-    of asReanmeState: 
-      discard
+    of asReanmeState:
+      footer(class = "px-2 navbar navbar-expand-lg navbar-light bg-light d-flex justify-content-between align-items-center"):
+        input()
+        navbtn "submit", bccPrimary, doNothing
 
-    else: 
-      discard
+    else: discard
 
 proc initBoard =
   let
     w = window.innerWidth
     h = window.innerHeight / 2
-    s = newStage("board")
+    s = newStage document.getElementById "board"
 
   with s:
     width = w
@@ -103,5 +105,5 @@ proc initBoard =
 
 
 when isMainModule:
-  setRenderer createDom, "root"
+  setRenderer createDom
   discard setTimeout(initBoard, 500)
