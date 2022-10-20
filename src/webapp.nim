@@ -17,6 +17,11 @@ type
     asPlaceNewState = "place new state"
     asStateSelected = "state is selected"
 
+    asTransitionSelectOtherState
+    asTransitionEnterTerminals
+
+    asN
+
   AppObject = object
     # --- canvas
     layer: KLayer
@@ -29,6 +34,8 @@ type
 
 # ----------------------------
 
+const stateRadius = 30
+
 var
   app = AppObject(
     step: asInitial,
@@ -37,8 +44,6 @@ var
     )
 
 # ----------------------------
-
-const stateRadius = 30
 
 proc rerender
 
@@ -51,29 +56,25 @@ proc findState(pos: Position): State =
 
 proc stateClick(e: KMouseEvent) =
   e.cancel
-  app.selectedState = findState((e.evt.offsetX.float, e.evt.offsetY.float))
-  app.step = asStateSelected
-  redraw()
+
+  let s = findState((e.evt.offsetX.float, e.evt.offsetY.float))
+  case app.step
+  of asInitial:
+    app.selectedState = s
+    app.step = asStateSelected
+    redraw()
+
+  of asTransitionSelectOtherState:
+    app.step = asTransitionEnterTerminals
+
+  else: discard
 
 proc backgroundClick(e: KMouseEvent) =
   case app.step
   of asPlaceNewState:
-    let
-      c = newCircle()
-      x = e.evt.offsetX.float
-      y = e.evt.offsetY.float
-
-    with c:
-      x = x
-      y = y
-      fill = pink
-      radius = stateRadius
-      onclick = stateClick
-      addTo app.layer
-
-    app.selectedState = randomStr(10).State
-    app.dfa.states[app.selectedState] = (x, y)
-    app.step = asStateSelected
+    app.step = asInitial
+    app.dfa.states[randomStr(10).State] =
+      (e.evt.offsetX.float, e.evt.offsetY.float)
 
   of asStateSelected:
     app.step = asInitial
@@ -81,6 +82,7 @@ proc backgroundClick(e: KMouseEvent) =
   else:
     discard
 
+  rerender()
   redraw()
 
 proc enterPlaceState =
@@ -88,7 +90,7 @@ proc enterPlaceState =
 
 proc setName =
   assert app.step == asStateSelected
-  let 
+  let
     newname = $getVNodeById("name-of-state").dom.value
     oldname = app.selectedState
     pos = app.dfa.states[oldname]
@@ -96,16 +98,59 @@ proc setName =
   app.selectedState = newname
   app.dfa.states[newname] = pos
   del app.dfa.states, oldname
-  # TODO remove transitions too
+  # FIXME use `rename` & from `dfa` module
 
+  rerender()
 
 proc resetState =
   app.step = asInitial
+
+proc resetState2(b: bool) =
+  discard
+
+proc removeState =
+  app.dfa.remove app.selectedState
+  app.step = asInitial
+  app.selectedState = ""
+  rerender()
 
 # ----------------------------
 
 proc rerender =
   destroyChildren app.layer
+
+  for s, p in app.dfa.states:
+    let
+      g = newGroup()
+      c = newCircle()
+      t = newText()
+
+    with c:
+      x = p.x
+      y = p.y
+      fill = pink
+      radius = stateRadius
+      onclick = stateClick
+      addTo g
+
+    with t:
+      x = p.x - stateRadius/2
+      y = p.y - stateRadius/2
+      align = "center"
+      text = $s
+      listening = false
+      addTo g
+
+
+    if s == app.dfa.initialState:
+      discard
+
+    if app.dfa.isAcceptable s:
+      discard
+
+    g.addto app.layer
+
+  draw app.layer
 
 proc createDom: VNode =
   buildHtml main:
@@ -114,9 +159,11 @@ proc createDom: VNode =
         case app.step
         of asStateSelected:
           navbtn "add transition", bccWarning, resetState
-          navbtn "initial state", bccSuccess, resetState
-          navbtn "final state", bccSuccess, resetState
-          navbtn "delete", bccDanger, resetState
+          navToggle "initial state", bccSuccess,
+            app.selectedState == app.dfa.initialState, resetState2
+          navToggle "final state", bccSuccess,
+              app.dfa.isAcceptable app.selectedState, resetState2
+          navbtn "delete", bccDanger, removeState
         else:
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccInfo, resetState
@@ -151,17 +198,12 @@ proc createDom: VNode =
       else: discard
 
 proc initBoard =
-  let
-    w = window.innerWidth
-    h = window.innerHeight / 2
-    s = newStage document.getElementById "board"
-
+  let s = newStage document.getElementById "board"
   with s:
-    width = w
-    height = h
-
-  s.add app.layer
-  s.onclick = backgroundClick
+    width = window.innerWidth
+    height = window.innerHeight / 2
+    add app.layer
+    onclick = backgroundClick
 
 
 when isMainModule:

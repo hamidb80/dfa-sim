@@ -22,6 +22,15 @@ const
 func navbar*: VNode =
   buildHtml nav(class = "navbar navbar-expand-lg navbar-light bg-light px-3 d-flex justify-content-between align-items-center")
 
+proc navToggle*(t: string, color: BootstrapColorClass, active: bool, action: proc(s: bool)): VNode =
+  let style = 
+    if active: ""
+    else: "-outline"
+
+  buildHtml button(class = fmt"btn mx-1 btn{style}-{color}"):
+    proc onclick = action(not active)
+    text t
+
 proc navbtn*(t: string, color: BootstrapColorClass, action: proc): VNode =
   buildHtml button(class = fmt"btn mx-1 btn-outline-{color}"):
     proc onclick = action()

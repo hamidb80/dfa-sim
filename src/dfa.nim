@@ -21,3 +21,9 @@ func step*(dfa: Dfa, s: State, input: Terminal): State =
 func isAcceptable*(dfa: Dfa, s: State): bool =
   s in dfa.finalStates
 
+func rename*(dfa: var Dfa, s1, s2: State) =
+  discard
+
+func remove*(dfa: var Dfa, s: State) =
+  del dfa.states, s
+

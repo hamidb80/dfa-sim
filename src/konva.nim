@@ -7,6 +7,7 @@ type
   KLayer* = object of KNode
   KShape* = object of KNode
 
+  KGroup* = object of KShape
   KCircle* = object of KShape
   KText* = object of KShape
   KLine* = object of KShape
@@ -35,9 +36,8 @@ func newLayer*(): KLayer
 func destroyChildren*(l: KLayer)
   {.importcpp: "#.destroyChildren()".}
 
-
-func newCircle*(): KCircle
-  {.importcpp: "new Konva.Circle()".}
+func draw*(l: KLayer)
+  {.importcpp: "#.draw()".}
 
 func add*(s, n: Knode)
   {.importcpp: "#.add(#)".}
@@ -46,38 +46,48 @@ func addTo*(n, s: Knode) =
   s.add n
 
 
+func newCircle*(): KCircle
+  {.importcpp: "new Konva.Circle()".}
+
+func newText*(): KText
+  {.importcpp: "new Konva.Text()".}
+
+func newGroup*(): KGroup
+  {.importcpp: "new Konva.Group()".}
+
+
 func `x=`*(k: KNode, n: Number)
   {.importcpp: "#.x(#)".}
 
-func `x`*(k: KNode)
+func `x`*(k: KNode): Number
   {.importcpp: "#.x()".}
 
 
 func `y=`*(k: KNode, n: Number)
   {.importcpp: "#.y(#)".}
 
-func `y`*(k: KNode)
+func `y`*(k: KNode): Number
   {.importcpp: "#.y()".}
 
 
 func `width=`*(k: KNode, n: Number)
   {.importcpp: "#.width(#)".}
 
-func `width`*(k: KNode)
+func `width`*(k: KNode): Number
   {.importcpp: "#.width()".}
 
 
 func `height=`*(k: KNode, n: Number)
   {.importcpp: "#.height(#)".}
 
-func `height`*(k: KNode)
+func `height`*(k: KNode): Number
   {.importcpp: "#.height()".}
 
 
 func `id=`*(k: KNode, n: Number)
   {.importcpp: "#.id(#)".}
 
-func `id`*(k: KNode)
+func `id`*(k: KNode): cstring
   {.importcpp: "#.id()".}
 
 
@@ -93,6 +103,27 @@ func `fill=`*(k: KNode, v: cstring)
 
 func `fill`*: cstring
   {.importcpp: "#.radius()".}
+
+
+func `text=`*(k: KText, n: cstring)
+  {.importcpp: "#.text(#)".}
+
+func `text`*(k: KText): cstring
+  {.importcpp: "#.text()".}
+
+
+func `align=`*(k: KText, n: cstring)
+  {.importcpp: "#.align(#)".}
+
+func `align`*(k: KText): cstring
+  {.importcpp: "#.align()".}
+
+
+func `listening=`*(k: KText, n: bool)
+  {.importcpp: "#.listening(#)".}
+
+func `listening`*(k: KText): bool
+  {.importcpp: "#.listening()".}
 
 
 func `onclick=`*(k: KNode, cb: proc(ev: KMouseEvent))
