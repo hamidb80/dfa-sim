@@ -27,12 +27,12 @@ proc navbtn*(t: string, color: BootstrapColorClass, action: proc): VNode =
     proc onclick = action()
     text t
 
-func status*: VNode = 
+func status*: VNode =
   buildHtml tdiv(class = "navbar-expand-lg navbar-dark bg-black text-white px-2 py-1")
 
-func extra*: VNode = 
+func extra*: VNode =
   buildHtml footer(class = "px-2 navbar navbar-expand-lg navbar-light bg-light d-flex justify-content-between align-items-center")
 
 func konva*(id: string): VNode =
   # `konva` creates elements, and `karax` is so mad about it
-  buildHtml verbatim fmt"<div id='{id}'></div>" 
+  buildHtml verbatim fmt"<div id='{id}'></div>"

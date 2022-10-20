@@ -1,8 +1,7 @@
-import std/[tables, hashes]
+import std/[tables, hashes, sets]
+import domain
 
 type
-  Position* = tuple[x,y: float]
-
   Terminal* = string
   State* = string
 
@@ -11,7 +10,7 @@ type
     alphabet*: seq[Terminal]
     transitionsFns*: Table[(State, Terminal), State]
     initialState*: State
-    finalStates*: seq[State]
+    finalStates*: Hashset[State]
 
 # func hash(s: State): Hash {.borrow.}
 # func hash(t: Terminal): Hash {.borrow.}
