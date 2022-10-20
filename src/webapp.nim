@@ -1,51 +1,104 @@
+import std/[strformat, with, dom, jsconsole]
+
 include karax/prelude
+import konva
 
 
-when false:
-  newGrammer.onclick = proc = 
-    input termianls
-  
-  state.onclick = proc =
-    select state
-    show buttons:
-      -add_transition
-      -set/unset as final
-      -remove
-      -rename 
-    
-  add_transition.onclick = proc = 
-    enter inputs [sparated_by_comma]
-    select other_state
+type
+  AppState = enum
+    asNormal
+    asStateSelected
 
-    if there was another line between them already:
-      add newstates to the line text
-    else:
-      draw_line state .. other_state
+  AppObject = object
+    state: AppState
+    layer: KLayer
+    transformer: KTransformer
 
 
-  run.onclick:
-    input = enter seq[Terminal]
+  BootstrapColorClass = enum
+    bccPrimary = "primary"
+    bccSecondary = "secondary"
+    bccSuccess = "success"
+    bccInfo = "info"
+    bccWarning = "warning"
+    bccDanger = "danger"
+    bccLight = "light"
+    bccDark = "dark"
 
-    var q = dfa.initialState
 
-    for t in input:
-      q  = dfa.step(q, t)
-      unfocus last state
-      focus new state
-      
-    if dfa.isAcceptable q:
-      discard
-    else:
-      discard
+func navbar(): VNode =
+  buildHtml nav(class = "navbar navbar-expand-lg navbar-light bg-light px-3 d-flex justify-content-between align-items-center")
 
+proc navbtn(t: string, color: BootstrapColorClass, action: proc): VNode =
+  # let ext =
+  #   if disabled: "disabled"
+  #   else: ""
+
+  buildHtml button(class = fmt"btn mx-1 btn-outline-{color}"):
+    proc onclick = action()
+    text t
+
+
+var app = AppObject(
+  layer: newLayer())
+
+proc stageClick(e: KMouseEvent) =
+  discard
+
+proc stateClick(e: KMouseEvent) =
+  e.cancel
+  e.target.fill = "black"
+
+
+proc newState =
+  let c = newCircle()
+  with c:
+    x = 100
+    y = 100
+    fill = "red"
+    radius = 10
+
+  c.onclick = stateClick
+
+  app.layer.add c
+
+# func bold(t: string): VNode =
+#   buildHtml span(class = "font-weight-bold"):
+#     text t
 
 proc createDom(): VNode =
-  buildHtml tdiv:
-    header:
-      button(class="btn btn-primary"):
-        text "new"
+  buildHtml main:
+    navbar:
+      tdiv:
+        navbtn "new state", bccPrimary, newState
+        navbtn "add transition", bccSuccess, newState
+        navbtn "rename", bccWarning, newState
+        navbtn "delete", bccDanger, newState
+        navbtn "run", bccInfo, newState
+        navbtn "save", bccDark, newState
 
-    tdiv(id = "mainframe")
+      h4:
+        bold:
+          text "DFA Simulation"
+
+    tdiv(id = "board")
 
 
-setRenderer createDom, "root"
+when isMainModule:
+  setRenderer createDom, "root"
+
+  proc setTimeout(ms: int, action: proc ()) =
+    discard setTimeout(action, ms)
+
+  setTimeout 500, proc =
+    let
+      w = window.innerWidth
+      h = window.innerHeight / 2
+      s = newStage("board")
+
+    with s:
+      width = w
+      height = h
+
+    s.add app.layer
+    s.onclick = stageClick

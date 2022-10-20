@@ -1,9 +1,9 @@
 import std/[jscore, jsffi]
-import std/[tables]
+import std/[tables, hashes]
 
 type
-  State* = distinct kstring
-  Terminal* = distinct kstring
+  State* = string
+  Terminal* = string
 
   Dfa* = object
     states*: seq[State]
@@ -12,6 +12,8 @@ type
     initialState*: State
     finalStates*: seq[State]
 
+# func hash(s: State): Hash {.borrow.}
+# func hash(t: Terminal): Hash {.borrow.}
 
 func step*(dfa: Dfa, s: State, input: Terminal): State =
   dfa.transitionsFns[(s, input)]
