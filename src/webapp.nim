@@ -1,4 +1,4 @@
-import std/[strformat, with, tables, strutils, sets]
+import std/[strformat, with, tables, strutils, sets, sugar, macros]
 
 import std/[dom, jsconsole]
 include karax/prelude
@@ -25,7 +25,6 @@ type
   AppObject = object
     # --- canvas
     layer: KLayer
-    transformer: KTransformer
     # --- data
     step: AppState
     dfa: Dfa
@@ -157,13 +156,16 @@ proc rerender =
     with c:
       x = p.x
       y = p.y
+      radius = stateRadius
       fill =
         if app.dfa.initialState == s: green
         else: pink
 
-      radius = stateRadius
       onclick = stateClick
       addTo g
+
+    if app.dfa.isFinal s:
+      c.stroke = "black"
 
     with t:
       x = p.x - stateRadius/2
@@ -173,10 +175,14 @@ proc rerender =
       listening = false
       addTo g
 
-    g.addto app.layer
+    capture g, s, p:
+      with g:
+        draggable = true
+        dragmove = proc =
+          let mv = (g.x, g.y)
+          app.dfa.states[s] = p + mv
 
-    if app.dfa.isFinal s:
-      c.stroke = "black"
+        addto app.layer
 
   for s, p in app.dfa.states:
     for otherState, terms in app.dfa.reducedTerms(s):
@@ -186,6 +192,7 @@ proc rerender =
         med = (p .. pp) * 0.2
 
       let a = newArrow()
+      # TODO loop
       with a:
         points = @[p.x, p.y, pp.x, pp.y]
         stroke = "black"
@@ -264,8 +271,8 @@ proc createDom: VNode =
 proc initBoard =
   let s = newStage document.getElementById "board"
   with s:
-    width = window.innerWidth
-    height = window.innerHeight / 2
+    width = window.innerWidth.toFloat
+    height = window.innerHeight.toFloat / 2
     add app.layer
     onclick = backgroundClick
 

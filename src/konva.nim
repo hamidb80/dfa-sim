@@ -1,22 +1,22 @@
 import std/[jsffi, dom]
 
 type
-  KNode* = object of JsObject
+  KNode* = ref object of JsObject
 
-  KStage* = object of KNode
-  KLayer* = object of KNode
-  KShape* = object of KNode
+  KStage* = ref object of KNode
+  KLayer* = ref object of KNode
+  KShape* = ref object of KNode
 
-  KGroup* = object of KShape
-  KArrow* = object of KShape
-  KCircle* = object of KShape
-  KText* = object of KShape
-  KLine* = object of KShape
+  KGroup* = ref object of KShape
+  KArrow* = ref object of KShape
+  KCircle* = ref object of KShape
+  KText* = ref object of KShape
+  KLine* = ref object of KShape
 
-  KTransformer* = object of JsObject
+  KTransformer* = ref object of KNode
 
-  KEvent* = object of JsObject
-  KMouseEvent* = object of KEvent
+  KEvent* = ref object of JsObject
+  KMouseEvent* = ref object of KEvent
     currentTarget*: KStage
     evt*: MouseEvent
     pointerId*: int
@@ -24,7 +24,7 @@ type
     `type`*: string
     cancelBubble*: bool
 
-  Number* = int or float
+  Number* = float
 
 
 
@@ -33,6 +33,9 @@ func newStage*(container: cstring | Element): KStage
 
 func newLayer*: KLayer
   {.importcpp: "new Konva.Layer()".}
+
+func newTransformer*: KTransformer
+  {.importcpp: "new Konva.Transformer()".}
 
 func newGroup*: KGroup
   {.importcpp: "new Konva.Group()".}
@@ -58,6 +61,9 @@ func add*(s, n: Knode)
 
 func addTo*(n, s: Knode) =
   s.add n
+
+func moveTo*(n, s: Knode) 
+  {.importcpp: "#.moveTo(#)".}
 
 
 func `x=`*(k: KNode, n: Number)
@@ -130,11 +136,18 @@ func `stroke`*(k: KNode): cstring
   {.importcpp: "#.stroke()".}
 
 
-func `listening=`*(k: KText, n: bool)
+func `listening=`*(k: KNode, n: bool)
   {.importcpp: "#.listening(#)".}
 
-func `listening`*(k: KText): bool
+func `listening`*(k: KNode): bool
   {.importcpp: "#.listening()".}
+
+
+func `draggable=`*(k: KNode, n: bool)
+  {.importcpp: "#.draggable(#)".}
+
+func `draggable`*(k: KNode): bool
+  {.importcpp: "#.draggable()".}
 
 
 func `points=`*(k: KNode, cs: seq[Number])
@@ -144,16 +157,24 @@ func `points`*(k: KNode): seq[Number]
   {.importcpp: "#.points()".}
 
 
+func `nodes=`*(k: KNode, cs: seq[KNode])
+  {.importcpp: "#.nodes(#)".}
+
+func `nodes`*(k: KNode): seq[KNode]
+  {.importcpp: "#.nodes()".}
+
+
 func `onclick=`*(k: KNode, cb: proc(ev: KMouseEvent))
   {.importcpp: "#.on('click', #)".}
 
-# func `stroke=`(k: KNode, v: Number)
-# func `stroke`
+func `dragend=`*(k: KNode, cb: proc)
+  {.importcpp: "#.on('dragend', #)".}
+
+func `dragmove=`*(k: KNode, cb: proc)
+  {.importcpp: "#.on('dragend', #)".}
 
 # func `strokeWidth=`(k: KNode, v: Number)
 # func `strokeWidth`
-
-# TODO define getter and setter
 
 proc cancel*(e: KEvent)
   {.importcpp: "#.cancelBubble = true".}
