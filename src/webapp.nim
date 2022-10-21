@@ -5,7 +5,7 @@ include karax/prelude
 import ui
 import konva
 
-import domain, dfa, utils
+import coordination, dfa, utils
 
 
 # ----------------------------

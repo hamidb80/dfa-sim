@@ -1,5 +1,5 @@
 import std/[tables, hashes, sets]
-import domain
+import coordination
 
 type
   Terminal* = string
