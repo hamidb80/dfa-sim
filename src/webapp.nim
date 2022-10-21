@@ -189,10 +189,7 @@ proc rerender =
 
   for s, p in app.dfa.states:
     for otherState, terms in app.dfa.reducedTerms(s):
-      let
-        pp = app.dfa.states[otherState]
-        label = terms.join(", ")
-        med = (p .. pp) * 0.4
+      let pp = app.dfa.states[otherState]
 
       let a = newArrow()
       with a:
@@ -208,16 +205,31 @@ proc rerender =
         stroke = "black"
         addTo app.layer
 
+      # TODO add select tranition
+  for s, p in app.dfa.states:
+    for otherState, terms in app.dfa.reducedTerms(s):
+      let
+        pp = app.dfa.states[otherState]
+        label = terms.join(", ")
+        med = (p .. pp) * 0.3
 
-      let txt = newText()
+        lbl = newLabel()
+        txt = newText()
+        tag = newTag()
+
+      with tag:
+        fill = "white"
+        addTo lbl
+
       with txt:
         text = label
+        fill = "black"
+        fontsize = 20
+        addTo lbl
+
+      with lbl:
         x = med.x
         y = med.y
-        fill = "black"
-        stroke = "white"
-        strokeWidth = 0.4
-        fontsize = 20
         addTo app.layer
 
 

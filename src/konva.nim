@@ -8,6 +8,8 @@ type
   KShape* = ref object of KNode
 
   KGroup* = ref object of KShape
+  KTag* = ref object of KShape
+  KLabel* = ref object of KShape
   KArrow* = ref object of KShape
   KCircle* = ref object of KShape
   KText* = ref object of KShape
@@ -37,6 +39,12 @@ func newLayer*: KLayer
 func newTransformer*: KTransformer
   {.importcpp: "new Konva.Transformer()".}
 
+func newLabel*: KLabel
+  {.importcpp: "new Konva.Label()".}
+
+func newTag*: KTag
+  {.importcpp: "new Konva.Tag()".}
+
 func newGroup*: KGroup
   {.importcpp: "new Konva.Group()".}
 
@@ -62,7 +70,7 @@ func add*(s, n: Knode)
 func addTo*(n, s: Knode) =
   s.add n
 
-func moveTo*(n, s: Knode) 
+func moveTo*(n, s: Knode)
   {.importcpp: "#.moveTo(#)".}
 
 
