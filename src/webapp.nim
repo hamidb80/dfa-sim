@@ -33,7 +33,7 @@ type
 
 # ----------------------------
 
-const stateRadius = 30
+const stateRadius = 30.0
 
 var
   app = AppObject(
@@ -66,13 +66,15 @@ proc stateClick(e: KMouseEvent) =
     app.step = asStateSelected
 
   of asTransitionSelectOtherState:
-    app.selectedStates.add s
-    app.step = asTransitionEnterTerminals
+    if app.selectedStates[0] != s: # loop
+      app.selectedStates.add s
+      app.step = asTransitionEnterTerminals
+    else:
+      app.step = asInitial
 
   else: discard
 
   redraw()
-
 
 proc backgroundClick(e: KMouseEvent) =
   case app.step
@@ -172,6 +174,7 @@ proc rerender =
       y = p.y - stateRadius/2
       align = "center"
       text = $s
+      fontsize = 20
       listening = false
       addTo g
 
@@ -189,12 +192,19 @@ proc rerender =
       let
         pp = app.dfa.states[otherState]
         label = terms.join(", ")
-        med = (p .. pp) * 0.2
+        med = (p .. pp) * 0.4
 
       let a = newArrow()
-      # TODO loop
       with a:
-        points = @[p.x, p.y, pp.x, pp.y]
+        points = block:
+          let
+            u = (p .. pp).unit
+            diff = len p..pp
+            ps = p - u*stateRadius
+            pe = pp + u*stateRadius
+
+          @[ps.x, ps.y, pe.x, pe.y]
+
         stroke = "black"
         addTo app.layer
 
@@ -204,6 +214,10 @@ proc rerender =
         text = label
         x = med.x
         y = med.y
+        fill = "black"
+        stroke = "white"
+        strokeWidth = 0.4
+        fontsize = 20
         addTo app.layer
 
 
@@ -226,7 +240,7 @@ proc createDom: VNode =
         of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccInfo, resetState
-          navbtn "save", bccDark, resetState
+          # navbtn "save", bccDark, resetState
 
         else:
           navbtn "cancel", bccWarning, resetState
@@ -267,6 +281,8 @@ proc createDom: VNode =
 
 
       else: discard
+
+    # TODO transition table
 
 proc initBoard =
   let s = newStage document.getElementById "board"

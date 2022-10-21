@@ -94,6 +94,20 @@ func `height`*(k: KNode): Number
   {.importcpp: "#.height()".}
 
 
+func `fontSize=`*(k: KNode, n: Number)
+  {.importcpp: "#.fontSize(#)".}
+
+func `fontSize`*(k: KNode): Number
+  {.importcpp: "#.fontSize()".}
+
+
+func `strokeWidth=`*(k: KNode, n: Number)
+  {.importcpp: "#.strokeWidth(#)".}
+
+func `strokeWidth`*(k: KNode): Number
+  {.importcpp: "#.strokeWidth()".}
+
+
 func `id=`*(k: KNode, n: Number)
   {.importcpp: "#.id(#)".}
 
