@@ -1,12 +1,11 @@
 import std/[tables, hashes, sets]
-import coordination
 
 type
   Terminal* = string
   State* = string
 
   Dfa* = object
-    states*: Table[State, Position]
+    states*: Hashset[State]
     alphabet*: seq[Terminal]
     transitions*: Table[State, Table[Terminal, State]]
     initialState*: State
@@ -29,9 +28,8 @@ func isFinal*(dfa: Dfa, s: State): bool =
   s in dfa.finalStates
 
 func rename*(dfa: var Dfa, oldState, newState: State) =
-  let pos = dfa.states[oldState]
-  dfa.states[newState] = pos
-  del dfa.states, oldState
+  dfa.states.excl oldState
+  dfa.states.incl newState
 
   if oldState in dfa.transitions:
     let ts = dfa.transitions[oldState]
@@ -50,9 +48,8 @@ func rename*(dfa: var Dfa, oldState, newState: State) =
   if dfa.initialState == oldState:
     dfa.initialState = newState
 
-
 func remove*(dfa: var Dfa, old: State) =
-  del dfa.states, old
+  dfa.states.excl old
 
   for _, ts in dfa.transitions.mpairs:
     var acc: seq[string]

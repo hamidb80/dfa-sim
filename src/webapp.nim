@@ -20,7 +20,6 @@ type
     asTransitionSelectOtherState
     asTransitionEnterTerminals
 
-    asN
 
   AppObject = object
     # --- canvas
@@ -29,7 +28,11 @@ type
     step: AppState
     dfa: Dfa
 
-    selectedStates: seq[string]
+    diagram: Diagram
+    selectedStates: seq[State]
+
+  Diagram = object
+    statesPos: Table[State, Position]
 
 # ----------------------------
 
@@ -47,7 +50,8 @@ var
 proc rerender
 
 proc findState(pos: Position): State =
-  for name, center in app.dfa.states:
+  for name in app.dfa.states:
+    let center = app.diagram.statespos[name]
     if distance(pos, center) <= stateRadius:
       return name
 
@@ -80,7 +84,9 @@ proc backgroundClick(e: KMouseEvent) =
   case app.step
   of asPlaceNewState:
     app.step = asInitial
-    app.dfa.states[randomStr(10).State] =
+    let name = randomStr(10).State
+    app.dfa.states.incl name
+    app.diagram.statesPos[name] =
       (e.evt.offsetX.float, e.evt.offsetY.float)
 
   else:
@@ -129,6 +135,11 @@ proc setName =
     oldName = app.selectedStates[0]
 
   app.dfa.rename oldName, newName
+
+  let p = app.diagram.statesPos[oldname]
+  app.diagram.statesPos[newName] = p
+  del app.diagram.statesPos, oldname
+
   app.selectedStates = @[newname]
   rerender()
 
@@ -149,8 +160,9 @@ proc removeState =
 proc rerender =
   destroyChildren app.layer
 
-  for s, p in app.dfa.states:
+  for s in app.dfa.states:
     let
+      p = app.diagram.statespos[s]
       g = newGroup()
       c = newCircle()
       t = newText()
@@ -183,13 +195,15 @@ proc rerender =
         draggable = true
         dragmove = proc =
           let mv = (g.x, g.y)
-          app.dfa.states[s] = p + mv
+          app.diagram.statespos[s] = p + mv
 
         addto app.layer
 
-  for s, p in app.dfa.states:
+  for s in app.dfa.states:
+    let p = app.diagram.statespos[s]
+
     for otherState, terms in app.dfa.reducedTerms(s):
-      let pp = app.dfa.states[otherState]
+      let pp = app.diagram.statespos[otherState]
 
       let a = newArrow()
       with a:
@@ -206,10 +220,11 @@ proc rerender =
         addTo app.layer
 
       # TODO add select tranition
-  for s, p in app.dfa.states:
+  for s in app.dfa.states:
+    let p = app.diagram.statespos[s]
     for otherState, terms in app.dfa.reducedTerms(s):
       let
-        pp = app.dfa.states[otherState]
+        pp = app.diagram.statespos[otherState]
         label = terms.join(", ")
         med = (p .. pp) * 0.3
 
