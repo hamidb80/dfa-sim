@@ -1,7 +1,7 @@
 import std/[strformat, with, tables, strutils, sets, sugar, macros]
 
-import std/[dom, jsconsole]
 include karax/prelude
+import std/[dom, jsconsole]
 import ui
 import konva
 
@@ -15,21 +15,21 @@ type
     asInitial = "initial"
 
     asPlaceNewState = "place new state"
-    asStateSelected = "state is selected"
-
-    asTransitionSelectOtherState
+    asTransitionSelects
     asTransitionEnterTerminals
+
+    asStateSelected = "state is selected"
+    asTransitionSelected = "transition is selected"
 
 
   AppObject = object
-    # --- canvas
     layer: KLayer
-    # --- data
     step: AppState
     dfa: Dfa
-
     diagram: Diagram
     selectedStates: seq[State]
+    previouslySelectedTerminals: seq[Terminal]
+    inp: string
 
   Diagram = object
     statesPos: Table[State, Position]
@@ -69,27 +69,27 @@ proc stateClick(e: KMouseEvent) =
     app.selectedStates = @[s]
     app.step = asStateSelected
 
-  of asTransitionSelectOtherState:
-    if app.selectedStates[0] != s: # loop
-      app.selectedStates.add s
-      app.step = asTransitionEnterTerminals
-    else:
-      app.step = asInitial
+  of asTransitionSelects:
+    app.selectedStates.add s
+    app.step = asTransitionEnterTerminals
 
   else: discard
 
+  rerender()
   redraw()
 
 proc backgroundClick(e: KMouseEvent) =
   case app.step
   of asPlaceNewState:
     app.step = asInitial
+
     let name = randomStr(10).State
     app.dfa.states.incl name
     app.diagram.statesPos[name] =
       (e.evt.offsetX.float, e.evt.offsetY.float)
 
   else:
+    reset app.selectedStates
     app.step = asInitial
 
   rerender()
@@ -99,21 +99,23 @@ proc enterPlaceState =
   app.step = asPlaceNewState
 
 proc enterNewTranstion =
-  app.step = asTransitionSelectOtherState
+  app.step = asTransitionSelects
 
 proc setTerminals =
-  let terminals = $getVNodeById("terminals").dom.value
+  let
+    terminals = $getVNodeById("terminals").dom.value
+    rel = toSlice app.selectedStates
+
+  if app.step == asTransitionSelected:
+    for t in app.previouslySelectedTerminals:
+      del app.dfa.transitions[rel.a], t
 
   for t in terminals.split ",":
-    let
-      term = t.strip
-      s1 = app.selectedStates[0]
-      s2 = app.selectedStates[1]
-
-    if s1 in app.dfa.transitions:
-      app.dfa.transitions[s1][term] = s2
+    let term = t.strip
+    if rel.a in app.dfa.transitions:
+      app.dfa.transitions[rel.a][term] = rel.b
     else:
-      app.dfa.transitions[s1] = totable {term: s2}
+      app.dfa.transitions[rel.a] = totable {term: rel.b}
 
   app.step = asInitial
   rerender()
@@ -155,12 +157,24 @@ proc removeState =
   reset app.selectedStates
   rerender()
 
+proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
+  proc(e: KMouseEvent) =
+
+  return proc(e: KMouseEvent) =
+    app.step = asTransitionSelected
+    app.selectedStates = @[dir.a, dir.b]
+    app.previouslySelectedTerminals = terminals
+    app.inp = terminals.join(", ")
+
+    rerender()
+    redraw()
+
 # ----------------------------
 
 proc rerender =
-  destroyChildren app.layer
+  destroyChildren app.layer # clear
 
-  for s in app.dfa.states:
+  for s in app.dfa.states: # states
     let
       p = app.diagram.statespos[s]
       g = newGroup()
@@ -173,6 +187,7 @@ proc rerender =
       radius = stateRadius
       fill =
         if app.dfa.initialState == s: green
+        elif s in app.selectedStates: lemon
         else: pink
 
       onclick = stateClick
@@ -199,11 +214,11 @@ proc rerender =
 
         addto app.layer
 
-  for s in app.dfa.states:
+  for s in app.dfa.states: # transition lines
     let p = app.diagram.statespos[s]
 
-    for otherState, terms in app.dfa.reducedTerms(s):
-      let pp = app.diagram.statespos[otherState]
+    for s2, terms in app.dfa.reducedTerms(s):
+      let pp = app.diagram.statespos[s2]
 
       let a = newArrow()
       with a:
@@ -216,15 +231,22 @@ proc rerender =
 
           @[ps.x, ps.y, pe.x, pe.y]
 
-        stroke = "black"
+        stroke =
+          if (app.step == asTransitionSelected) and (s..s2 ==
+              app.selectedStates):
+            "red"
+          else:
+            "black"
+
         addTo app.layer
 
       # TODO add select tranition
-  for s in app.dfa.states:
+
+  for s in app.dfa.states: # transition lables
     let p = app.diagram.statespos[s]
-    for otherState, terms in app.dfa.reducedTerms(s):
+    for s2, terms in app.dfa.reducedTerms(s):
       let
-        pp = app.diagram.statespos[otherState]
+        pp = app.diagram.statespos[s2]
         label = terms.join(", ")
         med = (p .. pp) * 0.3
 
@@ -236,19 +258,20 @@ proc rerender =
         fill = "white"
         addTo lbl
 
-      with txt:
-        text = label
-        fill = "black"
-        fontsize = 20
-        addTo lbl
+      capture s, s2, terms:
+        with txt:
+          text = label
+          fill = "black"
+          fontsize = 20
+          onclick = genTransitionClick(s .. s2, terms)
+          addTo lbl
 
       with lbl:
         x = med.x
         y = med.y
         addTo app.layer
 
-
-  draw app.layer
+  draw app.layer # update
 
 proc createDom: VNode =
   buildHtml main:
@@ -299,9 +322,9 @@ proc createDom: VNode =
 
         navbtn "set", bccPrimary, setName
 
-      of asTransitionEnterTerminals:
+      of asTransitionEnterTerminals, asTransitionSelected:
         input(class = "form-control", id = "terminals",
-          value = "",
+          value = app.inp,
           placeholder = "terminals separated by (,)")
 
         navbtn "set", bccPrimary, setTerminals

@@ -17,6 +17,7 @@ type
 const
   pink* = "#f8969b"
   green* = "#78c2ad"
+  lemon* = "#a5ad17"
 
 
 func navbar*: VNode =
