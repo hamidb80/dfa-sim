@@ -1,4 +1,4 @@
-import std/[strformat, with, tables, strutils, sets, sugar, macros]
+import std/[strformat, with, tables, strutils, sets, sugar, macros, math]
 
 include karax/prelude
 import std/[dom, jsconsole]
@@ -36,7 +36,9 @@ type
 
 # ----------------------------
 
-const stateRadius = 30.0
+const
+  stateRadius = 30.0
+  loopUpper = stateRadius*2
 
 var
   app = AppObject(
@@ -219,6 +221,7 @@ proc rerender =
         dragmove = proc =
           let mv = (g.x, g.y)
           app.diagram.statespos[s] = p + mv
+          rerender()
 
         addto app.layer
 
@@ -230,14 +233,26 @@ proc rerender =
 
       let a = newArrow()
       with a:
-        points = block:
-          let
-            u = (p .. pp).unit
-            diff = len p..pp
-            ps = p - u*stateRadius
-            pe = pp + u*stateRadius
+        points =
+          if s == s2:
+            let
+              diff = 20.0
+              x1 = p.x - diff
+              x2 = p.x + diff
+              yoffset = sqrt(stateRadius^2 - diff^2)
+              y1 = p.y - yoffset
+              y2 = p.y - loopUpper
+            
+            @[x1, y1, x1, y2, x2, y2, x2, y1]
 
-          @[ps.x, ps.y, pe.x, pe.y]
+          else:
+            let
+              u = (p .. pp).unit
+              diff = len p..pp
+              ps = p - u*stateRadius
+              pe = pp + u*stateRadius
+
+            @[ps.x, ps.y, pe.x, pe.y]
 
         stroke =
           if (app.step == asTransitionSelected) and (s..s2 ==
@@ -247,8 +262,6 @@ proc rerender =
             "black"
 
         addTo app.layer
-
-      # TODO add select tranition
 
   for s in app.dfa.states: # transition lables
     let p = app.diagram.statespos[s]
@@ -276,7 +289,9 @@ proc rerender =
 
       with lbl:
         x = med.x
-        y = med.y
+        y =
+          if s == s2: med.y - loopUpper
+          else: med.y
         addTo app.layer
 
   draw app.layer # update
