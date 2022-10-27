@@ -24,6 +24,21 @@ type
     asPlayEnterWord
     asPlayGo
 
+  DfaErrorKind = enum
+    dekMissingTransition = "missing transition"
+    dekInvalidTransition = "invalid transition"
+    dekInvalidInputTerminal = "invalid input terminal"
+
+  DfaError = object
+    case kind: DfaErrorKind
+    of dekMissingTransition, dekInvalidTransition:
+      states: Slice[State]
+      term: Terminal
+    of dekInvalidInputTerminal:
+      invalidTerm: Terminal
+
+  Step = object
+
 
   AppObject = object
     layer: KLayer
@@ -32,6 +47,8 @@ type
     diagram: Diagram
     selectedStates: seq[State]
     selectedTerminals: seq[Terminal]
+    errors: seq[DfaError]
+    steps: seq[Step]
     inp: string
 
   Diagram = object
@@ -61,7 +78,7 @@ proc switchState(s: AppState) =
   else:
     discard
 
-  app.step = s
+  app.stage = s
 
 proc findState(pos: Position): State =
   for name in app.dfa.states:
@@ -78,7 +95,7 @@ proc stateClick(e: KMouseEvent) =
     p = (e.evt.offsetX.float, e.evt.offsetY.float)
     s = findState(p)
 
-  case app.step
+  case app.stage
   of asInitial, asStateSelected:
     app.selectedStates = @[s]
     switchState asStateSelected
@@ -93,7 +110,7 @@ proc stateClick(e: KMouseEvent) =
   redraw()
 
 proc backgroundClick(e: KMouseEvent) =
-  case app.step
+  case app.stage
   of asPlaceNewState:
     switchState asInitial
 
@@ -116,20 +133,20 @@ proc enterNewTranstion =
   switchState asTransitionSelects
 
 proc setTerminals =
-  echo app.step, " <<"
+  echo app.stage, " <<"
   let terminals = block:
     let txt = $getVNodeById("input").dom.value
     collect:
       for term in txt.split ",":
         term.strip
 
-  case app.step
+  case app.stage
     of asInitial:
       app.dfa.terminals = terminals
 
     of asTransitionEnterTerminals, asTransitionSelected:
       let rel = toSlice app.selectedStates
-      if app.step == asTransitionSelected:
+      if app.stage == asTransitionSelected:
         for t in app.selectedTerminals:
           del app.dfa.transitions[rel.a], t
 
@@ -156,7 +173,7 @@ proc toggleAsFinal(t: bool) =
     app.dfa.finalStates.excl app.selectedStates[0]
 
 proc setName =
-  echo app.step
+  echo app.stage
   let
     newName = $getVNodeById("input").dom.value
     oldName = app.selectedStates[0]
@@ -283,7 +300,7 @@ proc rerender =
 
             @[ps.x, ps.y, pe.x, pe.y]
         stroke =
-          if (app.step == asTransitionSelected) and (s..s2 ==
+          if (app.stage == asTransitionSelected) and (s..s2 ==
               app.selectedStates):
             "red"
           else:
@@ -327,7 +344,7 @@ proc createDom: VNode =
   buildHtml main:
     navbar:
       tdiv:
-        case app.step
+        case app.stage
 
         of asStateSelected:
           navbtn "add transition", bccWarning, enterNewTranstion
@@ -358,9 +375,9 @@ proc createDom: VNode =
 
     status:
       bold: text "STATUS: "
-      text $app.step
+      text $app.stage
 
-      case app.step
+      case app.stage
       of asStateSelected:
         text " - "
         text app.selectedStates[0]
@@ -369,7 +386,7 @@ proc createDom: VNode =
         discard
 
     extra:
-      case app.step
+      case app.stage
       of asStateSelected:
         input(class = "form-control", id = "input",
           value = app.selectedStates[0],
@@ -386,7 +403,7 @@ proc createDom: VNode =
 
       of asPlayEnterWord:
         input(class = "form-control", id = "input",
-          value = app.inp,
+          value = "",
           placeholder = "terminals separated by (,)")
 
         navbtn "go!", bccPrimary, resetState
@@ -416,8 +433,24 @@ proc createDom: VNode =
                     span(class = "text-primary"):
                       styledText "?", bccDanger
 
-    sec "Result":
-      discard
+    if app.errors.len == 0:
+      sec "Result":
+        discard
+
+    else:
+      sec "Errors":
+        ul:
+          for e in app.errors:
+            li:
+              bold:
+                text $e.kind, ": "
+
+              case e.kind:
+              of dekMissingTransition, dekInvalidTransition:
+                text e.states.a, " -> ", e.states.a, " | ", e.term
+
+              of dekInvalidInputTerminal:
+                text e.invalidTerm
 
 proc initBoard =
   let s = newStage document.getElementById "board"

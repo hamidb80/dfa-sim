@@ -46,6 +46,11 @@ func styledText*(t: string, c: BootstrapColorClass): VNode =
 func spacex*(i: int): VNode =
   buildHtml span(class = "mx-" & $i)
 
+func text*(s: varargs[string]): VNode =
+  buildHtml p:
+    for t in s:
+      text t
+
 func sec*(title: string): VNode =
   buildHtml tdiv(class = "mt-4"):
     h3(class = "text-center"):
