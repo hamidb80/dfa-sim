@@ -6,7 +6,7 @@ type
 
   Dfa* = object
     states*: Hashset[State]
-    terminals*: Hashset[Terminal]
+    terminals*: seq[Terminal]
     transitions*: Table[State, Table[Terminal, State]]
     initialState*: State
     finalStates*: Hashset[State]
@@ -14,8 +14,10 @@ type
 # func hash(s: State): Hash {.borrow.}
 # func hash(t: Terminal): Hash {.borrow.}
 
-func step*(dfa: Dfa, s: State, input: Terminal): State =
-  dfa.transitions[s][input]
+func next*(dfa: Dfa, currentState: State, term: Terminal): State =
+  let tab = dfa.transitions[currentState]
+  if term in tab: tab[term]
+  else: tab["*"]
 
 func reducedTerms*(dfa: Dfa, s: State): Table[State, seq[Terminal]] =
   for t, so in dfa.transitions.getOrDefault s:

@@ -21,6 +21,9 @@ type
     asStateSelected = "state is selected"
     asTransitionSelected = "transition is selected"
 
+    asPlayEnterWord
+    asPlayGo
+
 
   AppObject = object
     layer: KLayer
@@ -51,6 +54,15 @@ var
 
 proc rerender
 
+proc switchState(s: AppState) =
+  case s:
+  of asInitial:
+    app.inp = app.dfa.terminals.join(", ")
+  else:
+    discard
+
+  app.step = s
+
 proc findState(pos: Position): State =
   for name in app.dfa.states:
     let center = app.diagram.statespos[name]
@@ -69,11 +81,11 @@ proc stateClick(e: KMouseEvent) =
   case app.step
   of asInitial, asStateSelected:
     app.selectedStates = @[s]
-    app.step = asStateSelected
+    switchState asStateSelected
 
   of asTransitionSelects:
     app.selectedStates.add s
-    app.step = asTransitionEnterTerminals
+    switchState asTransitionEnterTerminals
 
   else: discard
 
@@ -83,7 +95,7 @@ proc stateClick(e: KMouseEvent) =
 proc backgroundClick(e: KMouseEvent) =
   case app.step
   of asPlaceNewState:
-    app.step = asInitial
+    switchState asInitial
 
     let name = randomStr(10).State
     app.dfa.states.incl name
@@ -92,34 +104,45 @@ proc backgroundClick(e: KMouseEvent) =
 
   else:
     reset app.selectedStates
-    app.step = asInitial
+    switchState asInitial
 
   rerender()
   redraw()
 
 proc enterPlaceState =
-  app.step = asPlaceNewState
+  switchState asPlaceNewState
 
 proc enterNewTranstion =
-  app.step = asTransitionSelects
+  switchState asTransitionSelects
 
 proc setTerminals =
-  let
-    terminals = $getVNodeById("terminals").dom.value
-    rel = toSlice app.selectedStates
+  echo app.step, " <<"
+  let terminals = block:
+    let txt = $getVNodeById("input").dom.value
+    collect:
+      for term in txt.split ",":
+        term.strip
 
-  if app.step == asTransitionSelected:
-    for t in app.selectedTerminals:
-      del app.dfa.transitions[rel.a], t
+  case app.step
+    of asInitial:
+      app.dfa.terminals = terminals
 
-  for t in terminals.split ",":
-    let term = t.strip
-    if rel.a in app.dfa.transitions:
-      app.dfa.transitions[rel.a][term] = rel.b
+    of asTransitionEnterTerminals, asTransitionSelected:
+      let rel = toSlice app.selectedStates
+      if app.step == asTransitionSelected:
+        for t in app.selectedTerminals:
+          del app.dfa.transitions[rel.a], t
+
+      for term in terminals:
+        if rel.a in app.dfa.transitions:
+          app.dfa.transitions[rel.a][term] = rel.b
+        else:
+          app.dfa.transitions[rel.a] = totable {term: rel.b}
+
     else:
-      app.dfa.transitions[rel.a] = totable {term: rel.b}
+      echo "what"
 
-  app.step = asInitial
+  switchState asInitial
   rerender()
 
 proc setInitial(t: bool) =
@@ -133,9 +156,9 @@ proc toggleAsFinal(t: bool) =
     app.dfa.finalStates.excl app.selectedStates[0]
 
 proc setName =
-  assert app.step == asStateSelected
+  echo app.step
   let
-    newName = $getVNodeById("name-of-state").dom.value
+    newName = $getVNodeById("input").dom.value
     oldName = app.selectedStates[0]
 
   app.dfa.rename oldName, newName
@@ -148,14 +171,14 @@ proc setName =
   rerender()
 
 proc resetState =
-  app.step = asInitial
+  switchState asInitial
 
 proc resetState2(b: bool) =
   discard
 
 proc removeState =
   app.dfa.remove app.selectedStates[0]
-  app.step = asInitial
+  switchState asInitial
   reset app.selectedStates
   rerender()
 
@@ -163,7 +186,7 @@ proc deleteTransitions =
   for t in app.selectedTerminals:
     del app.dfa.transitions[app.selectedStates[0]], t
 
-  app.step = asInitial
+  switchState asInitial
   rerender()
   redraw()
 
@@ -171,7 +194,7 @@ proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
   proc(e: KMouseEvent) =
 
   return proc(e: KMouseEvent) =
-    app.step = asTransitionSelected
+    switchState asTransitionSelected
     app.selectedStates = @[dir.a, dir.b]
     app.selectedTerminals = terminals
     app.inp = terminals.join(", ")
@@ -180,7 +203,8 @@ proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
     redraw()
 
 proc run =
-  echo app.dfa.terminals
+  switchState asPlayEnterWord
+  redraw()
 
 # ----------------------------
 
@@ -316,7 +340,9 @@ proc createDom: VNode =
         of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccSuccess, run
+          spacex 2
           navbtn "save", bccDark, resetState
+          navbtn "load", bccInfo, resetState
 
         of asTransitionSelected:
           navbtn "delete", bccDanger, deleteTransitions
@@ -345,25 +371,53 @@ proc createDom: VNode =
     extra:
       case app.step
       of asStateSelected:
-        input(class = "form-control", id = "name-of-state",
+        input(class = "form-control", id = "input",
           value = app.selectedStates[0],
           placeholder = "name of the state")
 
-        navbtn "set", bccPrimary, setName
+        navbtn "set name", bccPrimary, setName
 
-      of asTransitionEnterTerminals, asTransitionSelected:
-        input(class = "form-control", id = "terminals",
+      of asTransitionEnterTerminals, asTransitionSelected, asInitial:
+        input(class = "form-control", id = "input",
           value = app.inp,
           placeholder = "terminals separated by (,)")
 
-        navbtn "set", bccPrimary, setTerminals
+        navbtn "set terminals", bccPrimary, setTerminals
+
+      of asPlayEnterWord:
+        input(class = "form-control", id = "input",
+          value = app.inp,
+          placeholder = "terminals separated by (,)")
+
+        navbtn "go!", bccPrimary, resetState
 
       else: discard
 
-    output:
-      discard
+    sec "Transition Table":
+      table(class = "table table-striped"):
+        thead:
+          tr:
+            th(scope = "col"): text "state/terminal"
+            for t in app.dfa.terminals:
+              th(scope = "col"): text t
+        tbody:
+          for s in app.dfa.states:
+            tr:
+              th(scope = "row"):
+                if s == app.dfa.initialState: styledText(s, bccPrimary)
+                else: text s
 
-    # TODO transition table
+              for t in app.dfa.terminals:
+                td:
+                  if s in app.dfa.transitions and (
+                    t in app.dfa.transitions[s] or "*" in app.dfa.transitions[s]):
+                    text app.dfa.next(s, t)
+                  else:
+                    span(class = "text-primary"):
+                      styledText "?", bccDanger
+
+    sec "Result":
+      discard
 
 proc initBoard =
   let s = newStage document.getElementById "board"
