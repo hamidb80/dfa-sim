@@ -195,8 +195,6 @@ func `dragend=`*(k: KNode, cb: proc)
 func `dragmove=`*(k: KNode, cb: proc)
   {.importcpp: "#.on('dragend', #)".}
 
-# func `strokeWidth=`(k: KNode, v: Number)
-# func `strokeWidth`
 
 proc cancel*(e: KEvent)
   {.importcpp: "#.cancelBubble = true".}
