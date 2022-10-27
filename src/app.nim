@@ -1,9 +1,8 @@
-import std/[strformat, with, tables, strutils, sets, sugar, macros, math]
+import std/[strformat, with, tables, strutils, sets, sugar, macros, math, json, sequtils]
 
 include karax/prelude
-import std/[dom, jsconsole]
-import ui
-import konva
+import std/[dom, jsconsole, jsffi, asyncjs]
+import web, ui, konva
 
 import coordination, dfa, utils
 
@@ -24,7 +23,9 @@ type
     asPlayEnterWord
     asPlayGo
 
-  AppObject = object
+    asLoad
+
+  AppData = object
     layer: KLayer
     stage: AppState
     dfa: Dfa
@@ -45,7 +46,7 @@ const
   loopUpper = stateRadius*2.3
 
 var
-  app = AppObject(
+  app = AppData(
     stage: asInitial,
     layer: newLayer(),
     selectedStates: @[],
@@ -218,27 +219,45 @@ proc enterPlayTerms =
   switchState asPlayEnterWord
   redraw()
 
+func `%`(p: Position): JsonNode =
+  %*[p.x, p.y]
+
+func `%`[T](hs: HashSet[T]): JsonNode =
+  % toseq hs
+
 proc save =
-  discard
+  download "dfa.json", $ %*{"dfa": app.dfa, "diagram": app.diagram.statesPos}
+
+proc parsePosition(j: JsonNode): Position =
+  (j[0].getFloat, j[1].getFloat)
+
+proc fillAppData(app: var AppData, j: JsonNode) =
+  reset app.dfa
+  reset app.diagram
+
+  for s, p in j["diagram"]:
+    app.diagram.statesPos[s] = parsePosition(p)
+
+  for s in j["dfa"]["states"]:
+    app.dfa.states.incl s.getstr
+
+  for s in j["dfa"]["finalStates"]:
+    app.dfa.finalStates.incl s.getstr
+
+  app.dfa.terminals = j["dfa"]["terminals"].to(seq[Terminal])
+  app.dfa.initialState = j["dfa"]["initialState"].getstr
+  app.dfa.transitions = j["dfa"]["transitions"].to(
+      Table[State, Table[Terminal, State]])
+
+
+proc getfile(e: Event, _: VNode) =
+  discard e.target.files[0].readfile.then proc(r: cstring) =
+    fillAppData app, ($r).parseJson
+    rerender()
+    redraw()
 
 proc load =
-  discard
-
-#[
-function download(filename, text) {
-  var element = document.createElement('a');
-  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-  element.setAttribute('download', filename);
-
-  element.style.display = 'none';
-  document.body.appendChild(element);
-
-  element.click();
-
-  document.body.removeChild(element);
-}
-
-]#
+  switchState asLoad
 
 # ----------------------------
 
@@ -375,8 +394,8 @@ proc createDom: VNode =
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccSuccess, enterPlayTerms
           spacex 2
-          navbtn "save", bccDark, resetState
-          navbtn "load", bccInfo, resetState
+          navbtn "save", bccDark, save
+          navbtn "load", bccInfo, load
 
         of asTransitionSelected:
           navbtn "delete", bccDanger, deleteTransitions
@@ -424,6 +443,10 @@ proc createDom: VNode =
           placeholder = "terminals separated by (,)")
 
         navbtn "go!", bccPrimary, getResult
+
+      of asLoad:
+        input(class = "form-control", type = "file", accept = "text/json",
+            onchange = getfile)
 
       else: discard
 
