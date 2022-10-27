@@ -17,7 +17,7 @@ type
 const
   pink* = "#f8969b"
   green* = "#78c2ad"
-  lemon* = "#a5ad17"
+  lemon* = "#e4ed0f"
 
 
 func navbar*: VNode =
@@ -41,6 +41,9 @@ func status*: VNode =
   buildHtml tdiv(class = "navbar-expand-lg navbar-dark bg-black text-white px-2 py-1")
 
 func extra*: VNode =
+  buildHtml footer(class = "px-2 navbar navbar-expand-lg navbar-light bg-light d-flex justify-content-between align-items-center")
+
+func output*: VNode =
   buildHtml footer(class = "px-2 navbar navbar-expand-lg navbar-light bg-light d-flex justify-content-between align-items-center")
 
 func konva*(id: string): VNode =

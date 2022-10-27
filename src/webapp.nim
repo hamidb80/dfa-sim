@@ -179,6 +179,9 @@ proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
     rerender()
     redraw()
 
+proc run =
+  echo app.dfa.terminals
+
 # ----------------------------
 
 proc rerender =
@@ -196,15 +199,17 @@ proc rerender =
       y = p.y
       radius = stateRadius
       fill =
-        if s in app.selectedStates: lemon
-        elif app.dfa.initialState == s: green
+        if s in app.selectedStates: green
+        elif s == app.dfa.initialState: lemon
         else: pink
-
+      stroke =
+        if app.dfa.isFinal s: "black"
+        else: "transparent"
+      strokeWidth =
+        if s in app.dfa.finalStates: 2
+        else: 0
       onclick = stateClick
       addTo g
-
-    if app.dfa.isFinal s:
-      c.stroke = "black"
 
     with t:
       x = p.x - stateRadius/2
@@ -253,14 +258,12 @@ proc rerender =
               pe = pp + u*stateRadius
 
             @[ps.x, ps.y, pe.x, pe.y]
-
         stroke =
           if (app.step == asTransitionSelected) and (s..s2 ==
               app.selectedStates):
             "red"
           else:
             "black"
-
         addTo app.layer
 
   for s in app.dfa.states: # transition lables
@@ -312,7 +315,7 @@ proc createDom: VNode =
 
         of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
-          navbtn "run", bccSuccess, resetState
+          navbtn "run", bccSuccess, run
           navbtn "save", bccDark, resetState
 
         of asTransitionSelected:
@@ -355,8 +358,10 @@ proc createDom: VNode =
 
         navbtn "set", bccPrimary, setTerminals
 
-
       else: discard
+
+    output:
+      discard
 
     # TODO transition table
 

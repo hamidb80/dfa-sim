@@ -6,7 +6,7 @@ type
 
   Dfa* = object
     states*: Hashset[State]
-    alphabet*: seq[Terminal]
+    terminals*: Hashset[Terminal]
     transitions*: Table[State, Table[Terminal, State]]
     initialState*: State
     finalStates*: Hashset[State]
@@ -64,4 +64,3 @@ func remove*(dfa: var Dfa, old: State) =
     reset dfa.initialState
 
   dfa.finalStates.excl old
-
