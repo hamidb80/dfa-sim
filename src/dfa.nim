@@ -4,6 +4,31 @@ type
   Terminal* = string
   State* = string
 
+  Step* = object
+    states*: Slice[State]
+    term*: Terminal
+
+  DfaMistakeKind* = enum
+    dmkInitialStateHasNotSet = "initial state has not set"
+    dmkMissingTransition = "missing transition"
+    dmkInvalidTransition = "invalid transition"
+    dmkInvalidInputTerminal = "invalid input terminal"
+
+  DfaMistake* = object
+    case kind*: DfaMistakeKind
+    of dmkInvalidInputTerminal:
+      invalidTerm*: Terminal
+
+    of dmkMissingTransition:
+      missingTerm*: Terminal
+      state*: State
+
+    of dmkInvalidTransition:
+      states*: Slice[State]
+      term*: Terminal
+
+    else: nil
+
   Dfa* = object
     states*: Hashset[State]
     terminals*: seq[Terminal]
@@ -66,3 +91,35 @@ func remove*(dfa: var Dfa, old: State) =
     reset dfa.initialState
 
   dfa.finalStates.excl old
+
+func inputErrors*(dfa: Dfa, input: seq[Terminal]): seq[DfaMistake] =
+  for term in input:
+    if term notin dfa.terminals:
+      result.add DfaMistake(kind: dmkInvalidInputTerminal, invalidTerm: term)
+
+func mistakes*(dfa: Dfa): seq[DfaMistake] =
+  if dfa.initialState notin dfa.states:
+    result.add DfaMistake(kind: dmkInitialStateHasNotSet)
+
+  for s1 in dfa.states:
+    if s1 in dfa.transitions:
+      let ttab = dfa.transitions[s1]
+      for term in dfa.terminals:
+        if not(term in ttab or "*" in ttab):
+          result.add DfaMistake(kind: dmkMissingTransition, state: s1,
+              missingTerm: term)
+
+      for term, s2 in ttab:
+        if (term != "*") and (term notin dfa.terminals):
+          result.add DfaMistake(kind: dmkInvalidTransition, term: term,
+              states: s1..s2)
+
+    else:
+      result.add DfaMistake(kind: dmkMissingTransition, missingTerm: "*", state: s1)
+
+func process*(dfa: Dfa, input: seq[Terminal]): seq[Step] =
+  var state = dfa.initialState
+  for t in input:
+    let nextState = dfa.next(state, t)
+    result.add Step(states: state..nextState, term: t)
+    state = nextState

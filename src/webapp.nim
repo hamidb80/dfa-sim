@@ -24,30 +24,14 @@ type
     asPlayEnterWord
     asPlayGo
 
-  DfaErrorKind = enum
-    dekMissingTransition = "missing transition"
-    dekInvalidTransition = "invalid transition"
-    dekInvalidInputTerminal = "invalid input terminal"
-
-  DfaError = object
-    case kind: DfaErrorKind
-    of dekMissingTransition, dekInvalidTransition:
-      states: Slice[State]
-      term: Terminal
-    of dekInvalidInputTerminal:
-      invalidTerm: Terminal
-
-  Step = object
-
-
   AppObject = object
     layer: KLayer
-    step: AppState
+    stage: AppState
     dfa: Dfa
     diagram: Diagram
     selectedStates: seq[State]
     selectedTerminals: seq[Terminal]
-    errors: seq[DfaError]
+    mistakes: seq[DfaMistake]
     steps: seq[Step]
     inp: string
 
@@ -62,7 +46,7 @@ const
 
 var
   app = AppObject(
-    step: asInitial,
+    stage: asInitial,
     layer: newLayer(),
     selectedStates: @[],
     )
@@ -132,13 +116,12 @@ proc enterPlaceState =
 proc enterNewTranstion =
   switchState asTransitionSelects
 
+func terms(s: string): seq[Terminal] =
+  for term in s.split ",":
+    result.add term.strip
+
 proc setTerminals =
-  echo app.stage, " <<"
-  let terminals = block:
-    let txt = $getVNodeById("input").dom.value
-    collect:
-      for term in txt.split ",":
-        term.strip
+  let terminals = terms $getVNodeById("input").dom.value
 
   case app.stage
     of asInitial:
@@ -157,7 +140,7 @@ proc setTerminals =
           app.dfa.transitions[rel.a] = totable {term: rel.b}
 
     else:
-      echo "what"
+      assert false
 
   switchState asInitial
   rerender()
@@ -173,19 +156,19 @@ proc toggleAsFinal(t: bool) =
     app.dfa.finalStates.excl app.selectedStates[0]
 
 proc setName =
-  echo app.stage
   let
     newName = $getVNodeById("input").dom.value
     oldName = app.selectedStates[0]
 
-  app.dfa.rename oldName, newName
+  if oldName != newName:
+    app.dfa.rename oldName, newName
 
-  let p = app.diagram.statesPos[oldname]
-  app.diagram.statesPos[newName] = p
-  del app.diagram.statesPos, oldname
+    let p = app.diagram.statesPos[oldname]
+    app.diagram.statesPos[newName] = p
+    del app.diagram.statesPos, oldname
 
-  app.selectedStates = @[newname]
-  rerender()
+    app.selectedStates = @[newname]
+    rerender()
 
 proc resetState =
   switchState asInitial
@@ -219,7 +202,19 @@ proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
     rerender()
     redraw()
 
-proc run =
+proc getResult =
+  app.selectedTerminals = terms $getVNodeById("input").dom.value
+  app.mistakes = mistakes(app.dfa) & inputErrors(app.dfa, app.selectedTerminals)
+
+  if app.mistakes.len == 0:
+    app.steps = app.dfa.process(app.selectedTerminals)
+    switchState asPlayGo
+  else:
+    switchState asInitial
+
+  redraw()
+
+proc enterPlayTerms =
   switchState asPlayEnterWord
   redraw()
 
@@ -356,7 +351,7 @@ proc createDom: VNode =
 
         of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
-          navbtn "run", bccSuccess, run
+          navbtn "run", bccSuccess, enterPlayTerms
           spacex 2
           navbtn "save", bccDark, resetState
           navbtn "load", bccInfo, resetState
@@ -406,7 +401,7 @@ proc createDom: VNode =
           value = "",
           placeholder = "terminals separated by (,)")
 
-        navbtn "go!", bccPrimary, resetState
+        navbtn "go!", bccPrimary, getResult
 
       else: discard
 
@@ -421,7 +416,8 @@ proc createDom: VNode =
           for s in app.dfa.states:
             tr:
               th(scope = "row"):
-                if s == app.dfa.initialState: styledText(s, bccPrimary)
+                if s == app.dfa.initialState: styledText("->" & s, bccDanger)
+                elif s in app.dfa.finalStates: styledText(s, bccPrimary)
                 else: text s
 
               for t in app.dfa.terminals:
@@ -433,24 +429,52 @@ proc createDom: VNode =
                     span(class = "text-primary"):
                       styledText "?", bccDanger
 
-    if app.errors.len == 0:
-      sec "Result":
-        discard
-
-    else:
+    if app.mistakes.len != 0:
       sec "Errors":
         ul:
-          for e in app.errors:
+          for e in app.mistakes:
             li:
               bold:
                 text $e.kind, ": "
 
               case e.kind:
-              of dekMissingTransition, dekInvalidTransition:
+              of dmkInvalidTransition:
                 text e.states.a, " -> ", e.states.a, " | ", e.term
 
-              of dekInvalidInputTerminal:
+              of dmkMissingTransition:
+                text $'"', e.state, $'"', " :: ", e.missingTerm
+
+              of dmkInvalidInputTerminal:
                 text e.invalidTerm
+
+              else: discard
+
+    if app.stage == asPlayGo:
+      sec "Result":
+        table(class = "table table-striped"):
+          thead:
+            tr:
+              for t in ["#", "state 1", "terminal", "state 2"]:
+                th(scope = "col"): text t
+          tbody:
+            for i, s in app.steps:
+              tr:
+                th(scope = "row"):
+                  text $(i+1)
+
+                for t in [s.states.a, s.term, s.states.b]:
+                  td:
+                    text t
+
+        h4(class = "p-3"):
+          let
+            lastState = app.steps[^1].states.b
+            cond = isFinal(app.dfa, lastState)
+
+          text "is accepted? "
+          case cond:
+          of true: styledText "Yes", bccSuccess
+          of false: styledText "No", bccDanger
 
 proc initBoard =
   let s = newStage document.getElementById "board"
