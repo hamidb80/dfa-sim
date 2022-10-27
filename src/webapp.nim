@@ -38,7 +38,7 @@ type
 
 const
   stateRadius = 30.0
-  loopUpper = stateRadius*2
+  loopUpper = stateRadius*2.3
 
 var
   app = AppObject(
@@ -196,8 +196,8 @@ proc rerender =
       y = p.y
       radius = stateRadius
       fill =
-        if app.dfa.initialState == s: green
-        elif s in app.selectedStates: lemon
+        if s in app.selectedStates: lemon
+        elif app.dfa.initialState == s: green
         else: pink
 
       onclick = stateClick
@@ -236,13 +236,13 @@ proc rerender =
         points =
           if s == s2:
             let
-              diff = 20.0
+              diff = 14.0
               x1 = p.x - diff
               x2 = p.x + diff
               yoffset = sqrt(stateRadius^2 - diff^2)
               y1 = p.y - yoffset
               y2 = p.y - loopUpper
-            
+
             @[x1, y1, x1, y2, x2, y2, x2, y1]
 
           else:
@@ -312,8 +312,8 @@ proc createDom: VNode =
 
         of asInitial:
           navbtn "new state", bccPrimary, enterPlaceState
-          navbtn "run", bccInfo, resetState
-          # navbtn "save", bccDark, resetState
+          navbtn "run", bccSuccess, resetState
+          navbtn "save", bccDark, resetState
 
         of asTransitionSelected:
           navbtn "delete", bccDanger, deleteTransitions
