@@ -28,7 +28,7 @@ type
     dfa: Dfa
     diagram: Diagram
     selectedStates: seq[State]
-    previouslySelectedTerminals: seq[Terminal]
+    selectedTerminals: seq[Terminal]
     inp: string
 
   Diagram = object
@@ -107,7 +107,7 @@ proc setTerminals =
     rel = toSlice app.selectedStates
 
   if app.step == asTransitionSelected:
-    for t in app.previouslySelectedTerminals:
+    for t in app.selectedTerminals:
       del app.dfa.transitions[rel.a], t
 
   for t in terminals.split ",":
@@ -157,13 +157,21 @@ proc removeState =
   reset app.selectedStates
   rerender()
 
+proc deleteTransitions =
+  for t in app.selectedTerminals:
+    del app.dfa.transitions[app.selectedStates[0]], t
+
+  app.step = asInitial
+  rerender()
+  redraw()
+
 proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
   proc(e: KMouseEvent) =
 
   return proc(e: KMouseEvent) =
     app.step = asTransitionSelected
     app.selectedStates = @[dir.a, dir.b]
-    app.previouslySelectedTerminals = terminals
+    app.selectedTerminals = terminals
     app.inp = terminals.join(", ")
 
     rerender()
@@ -291,6 +299,9 @@ proc createDom: VNode =
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccInfo, resetState
           # navbtn "save", bccDark, resetState
+
+        of asTransitionSelected:
+          navbtn "delete", bccDanger, deleteTransitions
 
         else:
           navbtn "cancel", bccWarning, resetState
