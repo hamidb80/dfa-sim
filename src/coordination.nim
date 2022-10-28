@@ -2,7 +2,6 @@ import std/[math]
 
 type
     Vector* = tuple[x, y: float]
-    Position* = Vector
     Line* = Slice[Vector]
 
 

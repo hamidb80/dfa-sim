@@ -4,57 +4,20 @@ include karax/prelude
 import std/[dom, jsconsole, jsffi, asyncjs]
 import web, ui, konva
 
-import coordination, dfa, utils
+import coordination, dfa, utils, types, serializer
 
+# app states -------------------
 
-# ----------------------------
-
-type
-  AppState = enum
-    asInitial = "initial"
-
-    asPlaceNewState = "place new state"
-    asTransitionSelects
-    asTransitionEnterTerminals
-
-    asStateSelected = "state is selected"
-    asTransitionSelected = "transition is selected"
-
-    asPlayEnterWord
-    asPlayGo
-
-    asLoad
-
-  AppData = object
-    layer: KLayer
-    stage: AppState
-    dfa: Dfa
-    diagram: Diagram
-    selectedStates: seq[State]
-    selectedTerminals: seq[Terminal]
-    mistakes: seq[DfaMistake]
-    steps: seq[Step]
-    inp: string
-
-  Diagram = object
-    statesPos: Table[State, Position]
-
-# ----------------------------
-
-const
-  stateRadius = 30.0
-  loopUpper = stateRadius*2.3
-
-var
-  app = AppData(
+var app = AppData(
     stage: asInitial,
     layer: newLayer(),
-    selectedStates: @[],
-    )
+    selectedStates: @[])
 
-# ----------------------------
+# forward declaration ---------
 
 proc rerender
+
+# state switches ------------------------
 
 proc switchState(s: AppState) =
   case s:
@@ -65,13 +28,47 @@ proc switchState(s: AppState) =
 
   app.stage = s
 
-proc findState(pos: Position): State =
+proc enterPlaceState =
+  switchState asPlaceNewState
+
+proc enterNewTranstion =
+  switchState asTransitionSelectSecondState
+
+proc resetAppState =
+  switchState asInitial
+
+proc enterPlayTerms =
+  switchState asPlayEnterInput
+
+proc enterLoadState =
+  switchState asLoad
+
+# konva events -----------------------
+
+proc findState(pos: Vector): State =
   for name in app.dfa.states:
-    let center = app.diagram.statespos[name]
+    let center = app.diagram[name]
     if distance(pos, center) <= stateRadius:
       return name
 
   raise newException(ValueError, "not found")
+
+proc backgroundClick(e: KMouseEvent) =
+  case app.stage
+  of asPlaceNewState:
+    switchState asInitial
+
+    let name = randomStr(10).State
+    app.dfa.states.incl name
+    app.diagram[name] =
+      (e.evt.offsetX.float, e.evt.offsetY.float)
+
+  else:
+    reset app.selectedStates
+    switchState asInitial
+
+  rerender()
+  redraw()
 
 proc stateClick(e: KMouseEvent) =
   e.cancel
@@ -85,7 +82,7 @@ proc stateClick(e: KMouseEvent) =
     app.selectedStates = @[s]
     switchState asStateSelected
 
-  of asTransitionSelects:
+  of asTransitionSelectSecondState:
     app.selectedStates.add s
     switchState asTransitionEnterTerminals
 
@@ -94,35 +91,22 @@ proc stateClick(e: KMouseEvent) =
   rerender()
   redraw()
 
-proc backgroundClick(e: KMouseEvent) =
-  case app.stage
-  of asPlaceNewState:
-    switchState asInitial
+proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
+  proc(e: KMouseEvent) =
 
-    let name = randomStr(10).State
-    app.dfa.states.incl name
-    app.diagram.statesPos[name] =
-      (e.evt.offsetX.float, e.evt.offsetY.float)
+  return proc(e: KMouseEvent) =
+    switchState asTransitionSelected
+    app.selectedStates = @[dir.a, dir.b]
+    app.selectedTerminals = terminals
+    app.inp = terminals.join(", ")
 
-  else:
-    reset app.selectedStates
-    switchState asInitial
+    rerender()
+    redraw()
 
-  rerender()
-  redraw()
-
-proc enterPlaceState =
-  switchState asPlaceNewState
-
-proc enterNewTranstion =
-  switchState asTransitionSelects
-
-func terms(s: string): seq[Terminal] =
-  for term in s.split ",":
-    result.add term.strip
+# actions ---------------------------
 
 proc setTerminals =
-  let terminals = terms $getVNodeById("input").dom.value
+  let terminals = splitTerms $getVNodeById("input").dom.value
 
   case app.stage
     of asInitial:
@@ -146,12 +130,12 @@ proc setTerminals =
   switchState asInitial
   rerender()
 
-proc setInitial(t: bool) =
-  if t == true:
+proc setInitialState(state: bool) =
+  if state == true:
     app.dfa.initialState = app.selectedStates[0]
 
-proc toggleAsFinal(t: bool) =
-  if t:
+proc toggleAsFinal(add: bool) =
+  if add:
     app.dfa.finalStates.incl app.selectedStates[0]
   else:
     app.dfa.finalStates.excl app.selectedStates[0]
@@ -164,18 +148,12 @@ proc setName =
   if oldName != newName:
     app.dfa.rename oldName, newName
 
-    let p = app.diagram.statesPos[oldname]
-    app.diagram.statesPos[newName] = p
-    del app.diagram.statesPos, oldname
+    let p = app.diagram[oldname]
+    app.diagram[newName] = p
+    del app.diagram, oldname
 
     app.selectedStates = @[newname]
     rerender()
-
-proc resetState =
-  switchState asInitial
-
-proc resetState2(b: bool) =
-  discard
 
 proc removeState =
   app.dfa.remove app.selectedStates[0]
@@ -191,82 +169,36 @@ proc deleteTransitions =
   rerender()
   redraw()
 
-proc genTransitionClick(dir: Slice[State], terminals: seq[Terminal]):
-  proc(e: KMouseEvent) =
-
-  return proc(e: KMouseEvent) =
-    switchState asTransitionSelected
-    app.selectedStates = @[dir.a, dir.b]
-    app.selectedTerminals = terminals
-    app.inp = terminals.join(", ")
-
-    rerender()
-    redraw()
-
 proc getResult =
-  app.selectedTerminals = terms $getVNodeById("input").dom.value
+  app.selectedTerminals = splitTerms $getVNodeById("input").dom.value
   app.mistakes = mistakes(app.dfa) & inputErrors(app.dfa, app.selectedTerminals)
 
   if app.mistakes.len == 0:
     app.steps = app.dfa.process(app.selectedTerminals)
-    switchState asPlayGo
+    switchState asPlayResult
   else:
     switchState asInitial
 
   redraw()
 
-proc enterPlayTerms =
-  switchState asPlayEnterWord
-  redraw()
-
-func `%`(p: Position): JsonNode =
-  %*[p.x, p.y]
-
-func `%`[T](hs: HashSet[T]): JsonNode =
-  % toseq hs
-
 proc save =
-  download "dfa.json", $ %*{"dfa": app.dfa, "diagram": app.diagram.statesPos}
+  download "dfa.json", $ %*{"dfa": app.dfa, "diagram": app.diagram}
 
-proc parsePosition(j: JsonNode): Position =
-  (j[0].getFloat, j[1].getFloat)
-
-proc fillAppData(app: var AppData, j: JsonNode) =
-  reset app.dfa
-  reset app.diagram
-
-  for s, p in j["diagram"]:
-    app.diagram.statesPos[s] = parsePosition(p)
-
-  for s in j["dfa"]["states"]:
-    app.dfa.states.incl s.getstr
-
-  for s in j["dfa"]["finalStates"]:
-    app.dfa.finalStates.incl s.getstr
-
-  app.dfa.terminals = j["dfa"]["terminals"].to(seq[Terminal])
-  app.dfa.initialState = j["dfa"]["initialState"].getstr
-  app.dfa.transitions = j["dfa"]["transitions"].to(
-      Table[State, Table[Terminal, State]])
-
-
-proc getfile(e: Event, _: VNode) =
+proc loadImpl(e: Event, _: VNode) =
   discard e.target.files[0].readfile.then proc(r: cstring) =
     fillAppData app, ($r).parseJson
+    switchState asInitial
     rerender()
     redraw()
 
-proc load =
-  switchState asLoad
-
-# ----------------------------
+# main --------------------------
 
 proc rerender =
   destroyChildren app.layer # clear
 
   for s in app.dfa.states: # states
     let
-      p = app.diagram.statespos[s]
+      p = app.diagram[s]
       g = newGroup()
       c = newCircle()
       t = newText()
@@ -302,16 +234,16 @@ proc rerender =
         draggable = true
         dragmove = proc =
           let mv = (g.x, g.y)
-          app.diagram.statespos[s] = p + mv
+          app.diagram[s] = p + mv
           rerender()
 
         addto app.layer
 
   for s in app.dfa.states: # transition lines
-    let p = app.diagram.statespos[s]
+    let p = app.diagram[s]
 
     for s2, terms in app.dfa.reducedTerms(s):
-      let pp = app.diagram.statespos[s2]
+      let pp = app.diagram[s2]
 
       let a = newArrow()
       with a:
@@ -344,10 +276,10 @@ proc rerender =
         addTo app.layer
 
   for s in app.dfa.states: # transition lables
-    let p = app.diagram.statespos[s]
+    let p = app.diagram[s]
     for s2, terms in app.dfa.reducedTerms(s):
       let
-        pp = app.diagram.statespos[s2]
+        pp = app.diagram[s2]
         label = terms.join(", ")
         med = (p .. pp) * 0.3
 
@@ -385,7 +317,7 @@ proc createDom: VNode =
         of asStateSelected:
           navbtn "add transition", bccWarning, enterNewTranstion
           navToggle "initial state", bccSuccess,
-            app.selectedStates[0] == app.dfa.initialState, setInitial
+            app.selectedStates[0] == app.dfa.initialState, setInitialState
           navToggle "final state", bccSuccess,
               app.dfa.isFinal app.selectedStates[0], toggleAsFinal
           navbtn "delete", bccDanger, removeState
@@ -395,13 +327,13 @@ proc createDom: VNode =
           navbtn "run", bccSuccess, enterPlayTerms
           spacex 2
           navbtn "save", bccDark, save
-          navbtn "load", bccInfo, load
+          navbtn "load", bccInfo, enterLoadState
 
         of asTransitionSelected:
           navbtn "delete", bccDanger, deleteTransitions
 
         else:
-          navbtn "cancel", bccWarning, resetState
+          navbtn "cancel", bccWarning, resetAppState
 
       h4:
         bold:
@@ -413,15 +345,7 @@ proc createDom: VNode =
       bold: text "STATUS: "
       text $app.stage
 
-      case app.stage
-      of asStateSelected:
-        text " - "
-        text app.selectedStates[0]
-
-      else:
-        discard
-
-    extra:
+    controller:
       case app.stage
       of asStateSelected:
         input(class = "form-control", id = "input",
@@ -437,16 +361,15 @@ proc createDom: VNode =
 
         navbtn "set terminals", bccPrimary, setTerminals
 
-      of asPlayEnterWord:
+      of asPlayEnterInput:
         input(class = "form-control", id = "input",
-          value = "",
           placeholder = "terminals separated by (,)")
 
         navbtn "go!", bccPrimary, getResult
 
       of asLoad:
         input(class = "form-control", type = "file", accept = "text/json",
-            onchange = getfile)
+            onchange = loadImpl)
 
       else: discard
 
@@ -494,7 +417,7 @@ proc createDom: VNode =
 
               else: discard
 
-    elif app.stage == asPlayGo:
+    elif app.stage == asPlayResult:
       sec "Result":
         table(class = "table table-striped"):
           thead:

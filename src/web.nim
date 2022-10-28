@@ -1,6 +1,7 @@
 import std/[dom, jscore, jsffi, asyncjs, sugar]
 
 proc download*(filename, text: cstring) =
+    # from stackoverfloa
     var element = document.createElement("a")
     element.setAttribute("href", "data:text/plaincharset=utf-8," & encodeURIComponent(text))
     element.setAttribute("download", filename)
