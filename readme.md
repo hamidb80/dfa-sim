@@ -14,3 +14,6 @@ then simply open `index.html` and TADA!
 - `Konva@8.3.13` graphic library
 - `Karax@1.2.2` SPA framework
 - `bootstrap@4` UI library
+
+## Tutorial
+[on Aparat](https://www.aparat.com/v/i23Vn)
