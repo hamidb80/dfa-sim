@@ -14,4 +14,4 @@ requires "nim >= 1.6.6"
 requires "karax"
 
 task gen, "generates 'script.js' file":
-    exec "nim -d:nimExperimentalAsyncjsThen js -o:build/script.js src/app.nim"
+    exec "nim -d:nimExperimentalAsyncjsThen -d:release js -o:build/script.js src/app.nim"

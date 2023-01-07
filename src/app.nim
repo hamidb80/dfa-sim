@@ -225,8 +225,9 @@ func `%`(p: Position): JsonNode =
 func `%`[T](hs: HashSet[T]): JsonNode =
   % toseq hs
 
-proc save =
-  download "dfa.json", $ %*{"dfa": app.dfa, "diagram": app.diagram.statesPos}
+proc `%`(app: AppData): JsonNode =
+  %*{"dfa": app.dfa, "diagram": app.diagram.statesPos}
+
 
 proc parsePosition(j: JsonNode): Position =
   (j[0].getFloat, j[1].getFloat)
@@ -249,12 +250,21 @@ proc fillAppData(app: var AppData, j: JsonNode) =
   app.dfa.transitions = j["dfa"]["transitions"].to(
       Table[State, Table[Terminal, State]])
 
+proc reloadApp(data: cstring) =
+  fillAppData app, ($data).parseJson
+  rerender()
+  redraw()
 
 proc getfile(e: Event, _: VNode) =
   discard e.target.files[0].readfile.then proc(r: cstring) =
-    fillAppData app, ($r).parseJson
-    rerender()
-    redraw()
+    reloadApp r
+
+proc minimizeImpl(data: cstring, cb: proc(s: cstring)) {.importc: "runMainFn".}
+proc minimize =
+  minimizeImpl cstring $(%app), reloadApp
+
+proc save =
+  download "dfa.json", $(%app)
 
 proc load =
   switchState asLoad
@@ -394,8 +404,9 @@ proc createDom: VNode =
           navbtn "new state", bccPrimary, enterPlaceState
           navbtn "run", bccSuccess, enterPlayTerms
           spacex 2
-          navbtn "save", bccDark, save
+          navbtn "minimize", bccWarning, minimize
           navbtn "load", bccInfo, load
+          navbtn "save", bccDark, save
 
         of asTransitionSelected:
           navbtn "delete", bccDanger, deleteTransitions
@@ -531,5 +542,6 @@ proc initBoard =
 
 
 when isMainModule:
+  console.log "app started ..."
   setRenderer createDom
   discard setTimeout(initBoard, 100)

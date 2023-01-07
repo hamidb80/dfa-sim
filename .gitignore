@@ -1,4 +1,8 @@
 build/bootstrap.*
-build/*.js
+build/script.js
+build/*.json
+build/*.tar
+build/pyodide*
 
+*.json
 play.*
