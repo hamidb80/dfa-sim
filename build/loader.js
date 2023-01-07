@@ -10,15 +10,11 @@ function def(code) {
 async function init() {
   if (pyodide == null) {
     console.info("start init ...")
-
     pyodide = await loadPyodide()
     console.info("pyodide loaded ...")
-
     let code = await (await fetch(scriptUrl, { cache: "no-cache" })).text()
     console.info("code loaded")
-    console.info(code)
     mainFn = def(code)
-
     console.info("init done")
   }
 }

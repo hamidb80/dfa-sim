@@ -4,5 +4,6 @@ build/*.json
 build/*.tar
 build/pyodide*
 
+*.zip
 *.json
 play.*
