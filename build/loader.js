@@ -32,7 +32,6 @@ function toPy(x) {
 
 function runMainFn(data, callback) {
   init().then(() => {
-    console.log(mainFn)
     let result = toJs(mainFn(toPy(data)))
     callback(result)
   })
